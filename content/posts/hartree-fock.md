@@ -6,7 +6,7 @@ draft: false
 enableMathJax: true
 ---
 <center>Restricted Hartree Fock (RHF) for Simple Atom (He and Be) using Slater Type Orbital (STO)
-    with Double Zeta Basis in Python</center>
+    with Double Zeta Basis in Python</center>
 <br>
 <center>Integral calculated by sympy</center>
 
