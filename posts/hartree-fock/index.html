@@ -1,0 +1,822 @@
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=generator content="Hugo 0.83.1"><title>Restricted Hartree Fock for Atom | yyrcd</title><meta name=description content="yueyericardo"><link rel=icon href="/images/favicon.ico?v=1"><link rel=stylesheet href=https://yyrcd.com/css/simpleness.css><link rel=canonical href=https://yyrcd.com/posts/hartree-fock/><link rel=alternate type=application/rss+xml href title=yyrcd><link href=/libs/font-awesome/5.13.0/css/all.min.css rel=stylesheet><script src=/libs/jquery/jquery.min.js></script><link rel=stylesheet href=/libs/katex/0.13.11/katex.min.css></link><script defer src=/libs/katex/0.13.11/katex.min.js></script><script defer src=/libs/katex/0.13.11/contrib/auto-render.min.js onload=renderMathInElement(document.body)></script></head><body class=container><nav class=navigation><div class=nav-bar><span class=nav-item><a href=/>Home</a></span>
+<span class=nav-item><a href=/n2s/>音乐迁移</a></span></div></nav><header class=nav-avatar><div class=circle-container><a style=color:transparent href=/><img src=/images/avatar.jpg></a></div><p>yyrcd</p></header><article class=post id=article><header class=post-header><h1 style=text-align:center>Restricted Hartree Fock for Atom</h1><div class=post-metadata><time datetime=2018-12-07T14:51:14-04:00>December 07, 2018</time> &nbsp;
+<i class="far fa-eye"></i>
+<span id=/posts/hartree-fock/ class=leancloud_visitors data-flag-title="Restricted Hartree Fock for Atom"><span class=leancloud-visitors-count></span></span>&nbsp;</div></header><div class=post-text><center>Restricted Hartree Fock (RHF) for Simple Atom (He and Be) using Slater Type Orbital (STO)
+with Double Zeta Basis in Python</center><br><center>Integral calculated by sympy</center><p style=text-align:center;margin-top:10px;margin-bottom:0><a target=_blank href=http://simuc.chem.ufl.edu/>SIMUC PROJECT</a></p><p style=text-align:center;margin-top:10px;margin-bottom:0>By <a target=_blank href=https://github.com/yueyericardo>Jinze (Richard) Xue</a>&nbsp;&nbsp;&nbsp;/&nbsp;
+<a target=_blank href=https://github.com/yueyericardo/simuc/tree/master/notebooks/pchem/hartree-fock/sto>Source code</a></p><p>Note: Some equations on this webpage are not rendered correctly, for a better reading experience, check <a href=https://nbviewer.jupyter.org/github/yueyericardo/simuc/blob/master/notebooks/pchem/hartree-fock/sto/1_Restricted_Hartree_Fock_for_Atom.ipynb>Nbviewer</a>.</p><ol><li><p>It will be better to understand if you have read <u>Levine, Quantum Chemistry, 7th Edition, chapter 11 and 14</u>.<br>There is an example calculation of Helium atom at page 412-414.</p></li><li><p>For well-organized and documented python file, please check <a href=https://github.com/yueyericardo/simuc/tree/master/notebooks/pchem/hartree-fock/sto>Github</a></p></li><li><p>This notebook is self-contained.<br>However, if you wanna try in other place, you should put <code>hf.py</code> file in the same directory where you wanna import it.</p></li></ol><h3 id=chapters>Chapters</h3><ul><li>Chapter 1: Restricted Hartree Fock (RHF) for Simple Atom (He and Be) using Slater Type Orbital (STO) with Double Zeta Basis in Python</li><li>Chapter 2: Slater Type Orbital (STO) VS Gaussian Type Orbital (GTO) <font color=red>【WIP】</font><br>Interactive tool <font color=red>【WIP】</font></li><li>Chapter 3: Restricted Hartree Fock (RHF) for Simple diatomic molecule (H2 and HeH+) using Gaussian Type Orbital (GTO) with STO-3G Basis in Python <font color=red>【Code is on <a href=https://github.com/yueyericardo/simuc/tree/master/notebooks/pchem/hartree-fock/gto>github</a>】【Document WIP】</font></li></ul><h3 id=overview>Overview</h3><ul><li><a href=#chapters>Chapters</a></li><li><a href=#overview>Overview</a></li><li><a href=#1-introduction>1. Introduction</a></li><li><a href=#2-bornoppenheimer-approximation>2. Born–Oppenheimer approximation</a></li><li><a href=#3-hartree-fock-approximation>3. Hartree fock approximation</a></li><li><a href=#4-why-build-matrix-and-how-to-solve-secular-equation>4. Why build matrix and how to solve secular equation?</a></li><li><a href=#5-how-to-build-matrix>5. How to build matrix</a></li><li><a href=#6-secular-equation>6. Secular Equation</a></li><li><a href=#7-total-energy>7. Total Energy</a></li><li><a href=#8-utils>8. Utils</a></li><li><a href=#9-run-hartree-fock>9. Run Hartree Fock</a></li><li><a href=#10-test>10. Test</a></li><li><a href=#11-excise---plot-the-charge-density-of-orbitals>11. Excise - Plot the charge density of orbitals</a></li><li><a href=#12-limitations>12. Limitations</a></li><li><a href=#13-reference>13. Reference</a></li></ul><hr><h3 id=1-introduction>1. Introduction</h3><p>In this notebook, we will use Helium Atom as an example to explain Restricted Hartree Fock (RHF) method.<br>(Restricted means only for closed shell molecule, orbitals are either doubly occupied or empty)</p><p>Helium has two electrons on 1s orbital.</p><p>One-electron wavefunction of 1s orbital could be written as $^*$
+$$\chi_{1 \mathrm{s}}^{\mathrm{STO}}=\left(\frac{\zeta^{3}}{\pi}\right)^{1 / 2} \exp (-\zeta r)$$</p><p style=text-align:center;font-size:13px;font-family:times><span style=font-weight:700>[*]</span>
+For simplicity, there is no angular part since it's s orbital.<br>$\zeta$ is a constant related to the effective charge of the nucleus, the nuclear charge being partly shielded by electrons.<p>With double zeta, we are saying we will buil two $\chi_{1 \mathrm{s}}^{\mathrm{STO}}$ function. And the final 1s orbital of Helium will be a linear combination of these two STO. $$\phi_1 = c_{11} \chi_1 + c_{21} \chi_2 \quad \text{(occupied orbital)}\;\; \tag {Eq1}$$ $$\phi_2 = c_{12} \chi_1 + c_{22} \chi_2 \quad \text{(unoccupied orbital)}$$<p style=color:red><b>The goal of hartree fock is using Self-Consistent Field method (SCF) to optimize coefficients to get close to the real wavefunction.</b></p><p>For Helium, from reference <a href=https://www.sciencedirect.com/science/article/pii/S0092640X74800161>[1]</a>, two double zeta are 1.45363, 2.91093.<br>We could build these two STO with each zeta using sympy like below.</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=color:#f92672>import</span> hf
+<span style=color:#f92672>import</span> sympy <span style=color:#f92672>as</span> sp
+<span style=color:#f92672>import</span> numpy <span style=color:#f92672>as</span> np
+<span style=color:#f92672>import</span> scipy.linalg
+<span style=color:#f92672>from</span> sympy <span style=color:#f92672>import</span> oo
+<span style=color:#f92672>from</span> sympy <span style=color:#f92672>import</span> diff
+<span style=color:#f92672>import</span> time
+<span style=color:#f92672>import</span> matplotlib
+<span style=color:#f92672>from</span> matplotlib <span style=color:#f92672>import</span> pyplot <span style=color:#66d9ef>as</span> plt
+<span style=color:#f92672>from</span> IPython.display <span style=color:#f92672>import</span> Math
+sp<span style=color:#f92672>.</span>init_printing()
+<span style=color:#f92672>%</span>matplotlib inline
+</code></pre></div><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python>r, r1, r2, zeta <span style=color:#f92672>=</span> sp<span style=color:#f92672>.</span>symbols(<span style=color:#e6db74>&#34;r, r1, r2, zeta&#34;</span>)
+n <span style=color:#f92672>=</span> sp<span style=color:#f92672>.</span>Symbol(<span style=color:#e6db74>&#39;n&#39;</span>, integer<span style=color:#f92672>=</span>True)
+</code></pre></div><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>STO</span>(zeta, n, r<span style=color:#f92672>=</span>r):
+    <span style=color:#e6db74>&#34;&#34;&#34;
+</span><span style=color:#e6db74>    Define a Slater Type Orbital function using sympy.
+</span><span style=color:#e6db74>
+</span><span style=color:#e6db74>    INPUT:
+</span><span style=color:#e6db74>    zeta: zeta for the STO.
+</span><span style=color:#e6db74>    n: principle quantum number for the STO.
+</span><span style=color:#e6db74>    &#34;&#34;&#34;</span>
+    f <span style=color:#f92672>=</span> r <span style=color:#f92672>**</span> (n <span style=color:#f92672>-</span> <span style=color:#ae81ff>1</span>) <span style=color:#f92672>*</span> sp<span style=color:#f92672>.</span>exp(<span style=color:#f92672>-</span>zeta <span style=color:#f92672>*</span> r)
+    <span style=color:#75715e># normalization</span>
+    N <span style=color:#f92672>=</span> sp<span style=color:#f92672>.</span>sqrt(<span style=color:#ae81ff>1</span> <span style=color:#f92672>/</span> sp<span style=color:#f92672>.</span>integrate(<span style=color:#ae81ff>4</span> <span style=color:#f92672>*</span> sp<span style=color:#f92672>.</span>pi <span style=color:#f92672>*</span> f <span style=color:#f92672>*</span> f <span style=color:#f92672>*</span> r <span style=color:#f92672>*</span> r, (r, <span style=color:#ae81ff>0</span>, <span style=color:#f92672>+</span>oo)))
+    <span style=color:#66d9ef>return</span> N <span style=color:#f92672>*</span> f
+</code></pre></div><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python>f1s_1 <span style=color:#f92672>=</span> hf<span style=color:#f92672>.</span>STO(zeta<span style=color:#f92672>=</span><span style=color:#ae81ff>1.45363</span>, n<span style=color:#f92672>=</span><span style=color:#ae81ff>1</span>)
+f1s_2 <span style=color:#f92672>=</span> hf<span style=color:#f92672>.</span>STO(zeta<span style=color:#f92672>=</span><span style=color:#ae81ff>2.91093</span>, n<span style=color:#f92672>=</span><span style=color:#ae81ff>1</span>)
+
+display(Math(<span style=color:#e6db74>&#39;$\chi_1 :&#39;</span>))
+display(f1s_1)
+display(Math(<span style=color:#e6db74>&#39;$\chi_2 :&#39;</span>))
+display(f1s_2)
+</code></pre></div><p>$\displaystyle \chi_1 :$</p><p>$\displaystyle \frac{1.7525919640199 e^{- 1.45363 r}}{\sqrt{\pi}}$</p><p>$\displaystyle \chi_2 :$</p><p>$\displaystyle \frac{4.96646801564063 e^{- 2.91093 r}}{\sqrt{\pi}}$</p><p><span style=font-weight:700;color:red>Note:</span> More detail about this will be covered at part 2, but I want to point out the main idea at beginning. So it could remind you what&rsquo;s our final goal, when you feel distracted.</p><p>By using Roothan equations below , which could be solved self-consistently for the orbital coefficient matrix <strong>C</strong> and orbital energy eigenvalues $\epsilon_i$ by iterations, we could finally</p><ol><li>get close to the real wavefunction (using improved Coefficients for Eq1).</li><li>get close to correct Molecular orbital energies (using $\epsilon_i$), to get the real total energy</li></ol><p>$${\mathbf {F}}{\mathbf {C}}={\mathbf {S}}{\mathbf {C}}{\mathbf {\epsilon }}$$</p><p style=text-align:center;font-size:13px;font-family:times><span style=font-weight:700>Note:</span>
+F (Fock matrix), S (Overlap matrix) are inputs.<br>S matrix is fixed, F matrix is changing every iteration because of the improved C.<br>C (Coefficient matrix) and $\epsilon_i$ (eigenvalues) are results.<br><p><hr><h3 id=2-bornoppenheimer-approximation>2. Born–Oppenheimer approximation</h3><p>Using Born–Oppenheimer approximation, molecular Hamiltonian could be expressed as</p><p>$${\displaystyle H=H_{\text{e}}+T_{\text{n}}}$$</p><p style=text-align:center;font-size:13px;font-family:times><span style=font-weight:700>Note:</span>
+e (electron), n (nuclear)<br><p>Where<p>$${\displaystyle H_{\text{e}}=-\sum _{i}{{\frac {1}{2}}\nabla _{i}^{2}}-\sum _{i,\alpha}{\frac {Z_{\alpha}}{r_{i\alpha}}}+\sum _{i>j}{\frac {1}{r_{ij}}}+\sum _{\beta>\alpha}{\frac {Z_{\alpha}Z_{\beta}}{R_{\alpha \beta}}}\quad {\text{and}}\quad T_{\text{n}}=-\sum _{\alpha}{{\frac {1}{2M_{\alpha}}}\nabla _{\alpha}^{2}}}$$</p><p style=text-align:center;font-size:13px;font-family:times><span style=font-weight:700>Note:</span>
+i, j (electron), $\alpha$, $\beta$ (nuclear)<br><p><p>$H_e$:</p><ol><li>sum of kinetic-energy operators for each electron</li><li>sum of nuclear–electronic Coulombic attraction terms</li><li>sum of electron-electron repulsion energy</li><li>sum of nuclear-nuclear repulsion energy ($V_{NN}$)</li></ol><p>$T_n$:</p><ol><li>sum of kinetic-energy operators for each nuclear</li></ol><p>Classically, during the time of a cycle of electronic motion, the change in nuclear configuration is negligible. Thus, considering the nuclei as fixed, we omit the nuclear kinetic-energy terms $T_n$. So commonly when we say hartree fock energy, we are only talking about $H_e$ term.</p><p>$${\displaystyle H_{\text{e}}=-\sum _{i}{{\frac {1}{2}}\nabla _{i}^{2}}-\sum _{i,\alpha}{\frac {Z_{\alpha}}{r_{i\alpha}}}+\sum_{i} \sum_{j>i}{\frac {1}{r_{ij}}} + V_{NN}}$$</p><p>The first 3 terms together is purely electronic Hamiltonian.</p><hr><h3 id=3-hartree-fock-approximation>3. Hartree fock approximation</h3><p>Because of the inter-electronic repulsion term $\frac{1}{r_{i j}}$, the Schrödinger equation for a molecule wavefunction is not separable. So the true wave function cannot be written as the product of n one-electron functions.</p><p>The essence of hartree-fock approximation is to treat electron-electron repulsion in an average way, so this complicated many-electron problem could be solved as one-electron problem.</p><p>Then the molecular wavefunction could be written as a product of all one-electron wavefunctions.
+The functions chosen to represent each electron is based on the hydrogen-like atomic wavefunction. (<span style=font-weight:700;color:red> Note: </span>This is the reason why we use Slater type Orbital (STO), because it&rsquo;s transformed from exact wavefunction for an electron around a hydrogen atom)</p><p>$$
+\Psi({r_1 r_2})=\phi_{1}\left(\boldsymbol{r}_{1}\right) \phi_{2}\left(\boldsymbol{r}_{2}\right)
+$$</p><p>However this product does not satisfy antisymmetric requirements (which means if you swap electrons the sign of the wavefunction should invert). This problem can be overcome by taking a linear combination of both products:</p><p>$$
+\begin{aligned} \Psi\left(\mathbf{r}<em>{1}, \mathbf{r}</em>{2}\right) &=\frac{1}{\sqrt{2}}\left{\phi_{1}\left(\mathbf{r}_{1}\right) \phi_{2}\left(\mathbf{r}_{2}\right)-\phi_{1}\left(\mathbf{r}_{2}\right) \phi_{2}\left(\mathbf{r}_{1}\right)\right} \ &=\frac{1}{\sqrt{2}}\left|\begin{array}{ll}{\phi_{1}\left(\mathbf{r}_{1}\right)} & {\phi_{2}\left(\mathbf{r}_{1}\right)} \ {\phi_{1}\left(\mathbf{r}_{2}\right)} & {\phi_{2}\left(\mathbf{r}_{2}\right)}\end{array}\right| \end{aligned}
+$$</p><p>In this way, the Schrödinger equation would then be separated into n one-electron hydrogenlike equations.</p><p>Suppose there is an operator called Fock operator $\hat F$, the eigenvalue corresponding to $\hat F$ on a one-electron wavefunction is the energy related to this electron.</p><p>Each electron energy $\varepsilon_{i}$ will include</p><ol><li>kinetic-energy for this electron</li><li>sum of coulombic attraction between this electron and all nuclears</li><li>the potential of this electron interacting with an averaged distribution of other electrons, (which is calculated by treating all of the other electrons within the molecule as a smooth distribution of negative charge, and this is the major simplification inherent in the Hartree–Fock method).<br>(What does this means? explained at below )</li></ol><p><span style=font-weight:700;color:red>Note:</span> If we take$\sum_{i}^{n} {\varepsilon_{i}}$, we will count each interelectronic repulsion twice, which needs to be subtracted when calculating total energy of molecule.</p><p>What&rsquo;s the meaing of the potential of this electron interacting with an averaged distribution of other electrons?
+suppose we want to find the electron-electron repulsion potential ($\text{Vee}$) of electron 1 with electron 2.</p><p>$$
+\text{Vee}<em>{1 2}=\left\langle\phi (1)^*|\frac{1}{r</em>{1 2}} | \phi (1)\right\rangle
+$$</p><p>This is not solvable, because we don&rsquo;t know the location of electron (2).</p><p>And hartree fock simplify this to:<br>(recall that $\left|\phi(2)\right|^{2}$ is the probability density of electron (2)</p><p>$$\text{Vee}<em>{1 2}=\left\langle\phi (1)^*|;;; \int \frac{\left|\phi(2)\right|^{2}}{r</em>{12}} d v_{2} ;;; | \phi (1)\right\rangle \tag{Eq2}$$</p><p>By using the probability density of electron (2) $\left|\phi(2)\right|^{2}$,</p><p>$$\text{infinitesimal charge density} * \text{infinitesimal volume} = \text{infinitesimal charge}$$</p><p>and integrate over all space, we could get the repulsion energy above.<br>It could be also rewritten as, which is more commonly used:</p><p>$$
+\text{Vee}_{1 2}= \int \int \frac{\left|\phi(2)\right|^{2} \phi (1)^* \phi (1)}{r_{12}} d v_{2}d v_{1}
+$$
+$$
+= \int \int \frac{\phi(2)^*\phi(2) \phi (1)^* \phi (1)}{r_{12}} d v_{2}d v_{1}
+$$</p><h4 style=color:#12a8f1>Fock operator</h4>The operator corresponding to one electron energy $\varepsilon_{i}$ is fock operator. (For the restricted case which assumes closed-shell orbitals and single- determinantal wavefunctions)<p>$$\hat{F}(i)=-\frac{1}{2} \nabla_{i}^{2}-\sum_{\alpha} \frac{Z_{\alpha}}{r_{1 \alpha}} + \sum_{j=1}^{n / 2}\left[2 \hat{J}_{j}(i)-\hat{K}_{j}(i)\right]$$</p><p>where:</p><ul><li>${\displaystyle {\hat {F}}(i)}$ is the Fock operator for the i-th electron in the system,</li><li>$-\frac{1}{2} \nabla_{i}^{2}-\sum_{\alpha} \frac{Z_{\alpha}}{r_{1 \alpha}} $ are kinetics energy and sum of nuclear-electron attraction respectively.<br>These two terms are often considered as the core terms, and refered as $\hat{H}^{\mathrm{core}}_i$</li></ul><p>So Fock operator could be rewritten as
+$$\hat{F}(i)=\hat{H}<em>{core}(i)+\sum</em>{j=1}^{n / 2}\left[2 \hat{J}<em>{j}(i)-\hat{K}</em>{j}(i)\right]$$</p><ul><li>${\displaystyle n}$ is the number of electrons and ${\displaystyle {\frac {n}{2}}}$ is the number of occupied orbitals in the closed-shell system,</li><li>${\displaystyle {\hat {J}}<em>{j}(i)}$ is the Coulomb operator, defining the repulsive force between the j-th and i-th electrons in the system, (explained at Eq2)
+$$
+\hat{J}</em>{j}(1) f(1) =f(1) \int\left|\phi_{j}(2)\right|^{2} \frac{1}{r_{12}} d v_{2}
+$$</li></ul><p style=text-align:center;font-size:13px;font-family:times><span style=font-weight:700>Note:</span>
+${\displaystyle f(1)}$, ${\displaystyle f(2)}$ are the one-electron wavefunctions acted upon by the exchange operator as functions of the electron positions,<br>and ${\displaystyle \phi _{j}(1)}$ and ${\displaystyle \phi _{j}(2)}$ are the one-electron wavefunction of the jth electron as functions of the positions of the electrons.<br><p><ul><li>${\displaystyle {\hat {K}}_{j}(i)}$ is the exchange operator, defining the quantum effect produced by exchanging two electrons.</li></ul><p>$$\hat{K}<em>{j}(1) f(1) =\phi</em>{j}(1) \int \frac{\phi_{j}^{*}(2) f(2)}{r_{12}} d v_{2}$$</p><p>The Coulomb operator is multiplied by two since there are two electrons in each occupied orbital. The exchange operator is not multiplied by two since it has a non-zero result only for electrons which have the same spin as the i-th electron.</p><h4 style=color:#12a8f1>Roothan equation</h4>The eigenvalue corresponding to the fock operator is the molecular orbital energies, electrons will occupy start from the lowest level, since we are dealing closed shell molecule, each orbital will has 2 or 0 electrons.<p>The Roothaan equations are a representation of the Hartree–Fock equation in a non orthonormal basis set (molecular orbitals represented by linear combination of atomic orbitals), which could be solved in matrix way that computer is good at.</p><p>$${\mathbf {F}}{\mathbf {C}}={\mathbf {S}}{\mathbf {C}}{\mathbf {\epsilon }}$$</p><p style=text-align:center;font-size:13px;font-family:times><span style=font-weight:700>Note:</span>
+F (Fock matrix), S (Overlap matrix) are inputs.<br>S matrix is fixed, F matrix is changing every iteration because of the improved C.<br>C (Coefficient matrix) and $\epsilon_i$ (eigenvalues) are results.<br><p><h4 style=color:#12a8f1>Why iterations?</h4><p>Since the Fock operator depends on the orbitals used to construct the corresponding Fock matrix, the eigenfunctions of the Fock operator are in turn new orbitals, which can be used to construct a new Fock operator. In this way, the Hartree–Fock orbitals are optimized iteratively until the change in total electronic energy falls below a predefined threshold. In this way, a set of self-consistent one-electron orbitals is calculated. The Hartree–Fock electronic wave function is then the Slater determinant constructed from these orbitals. Following the basic postulates of quantum mechanics, the Hartree–Fock wave function can then be used to compute any desired chemical or physical property within the framework of the Hartree–Fock method and the approximations employed.</p><hr><h3 id=4-why-build-matrix-and-how-to-solve-secular-equation>4. Why build matrix and how to solve secular equation?</h3><p>Because in this way, computer could solve it efficiently.</p><details><summary><span style=font-weight:700;color:red>Why build matrix? Click to uncollapse</span>
+(This part is from <a target=_blank href=https://chem.libretexts.org/Bookshelves/Physical_and_Theoretical_Chemistry_Textbook_Maps/Book%3A_Symmetry_(Vallance)/20%3A_Calculating_Orbital_Energies_and_Expansion_Coefficients>Calculating Orbital Energies and Expansion Coefficients - Chemistry LibreTexts</a></summary><p>Solving secular equation is actually calculating orbital energies and coefficients based on <strong>variation principle</strong>, which states that any approximate wavefunction must have a higher energy than the true wavefunction.
+(This part is from <a href=https://chem.libretexts.org/Bookshelves/Physical_and_Theoretical_Chemistry_Textbook_Maps/Book%3A_Symmetry_(Vallance)/20%3A_Calculating_Orbital_Energies_and_Expansion_Coefficients>Calculating Orbital Energies and Expansion Coefficients - Chemistry LibreTexts</a> .)</p><p>Let&rsquo;s ignore the coulomb $\hat J$ and exchange $\hat K$ operator in fock operator, what&rsquo;s left is one electron Hamiltonian core operator $\hat H_{core}$. So how to calculate eigenvalue of Hamiltonian core operator and it&rsquo;s corresponding wavefunction of Helium with double zeta basis?<br>(Fock operator could be used as the same way.)</p><p>$$
+E=\frac{\langle\phi|\hat{H}| \phi\rangle}{\langle\phi | \phi\rangle}
+$$
+Where
+$$\phi = c_{1} \chi_1 + c_{2} \chi_2 \quad \text{(unnormalized)} $$
+Plug in $\phi$ and expand</p><p>$$
+\begin{aligned} E &=\frac{\left\langle c_{1} \chi_{1}+c_{2} \chi_{2}|\hat{H}| c_{1} \chi_{1}+c_{2} \chi_{2}\right\rangle}{\left\langle c_{1} \chi_{1}+c_{2} \chi_{2} | c_{1} \chi_{1}+c_{2} \chi_{2}\right\rangle} \ &=\frac{\left\langle c_{1} \chi_{1}|\hat{H}| c_{1} \chi_{1}\right\rangle+\left\langle c_{1} \chi_{1}|\hat{H}| c_{2} \chi_{2}\right\rangle+\left\langle c_{2} \chi_{2}|\hat{H}| c_{1} \chi_{1}\right\rangle+\left\langle c_{2} \chi_{2}|\hat{H}| c_{2} \chi_{2}\right\rangle}{\left\langle c_{1} \chi_{1}| c_{1}\chi_{1}\right\rangle+\left\langle c_{1} \chi_{1}| c_{2} \chi_{2}\right\rangle+\left\langle c_{2} \chi_{2} | c_{1} \chi_{1}\right\rangle+\left\langle c_{2} \chi_{2} | c_{2} \chi_{2}\right\rangle} \ &=\frac{c_{1}^{2}\left\langle\chi_{1}|\hat{H}| \chi_{1}\right\rangle+ c_{1} c_{2}\left\langle\chi_{1}|\hat{H}| \chi_{2}\right\rangle+ c_{2} c_{1}\left\langle\chi_{2}|\hat{H}| \chi_{1}\right\rangle+ c_{2}^{2}\left\langle\chi_{2}|\hat{H}| \chi_{2}\right\rangle}{c_{1}^{2}\left\langle\chi_{1} | \chi_{1}\right\rangle+ c_{1} c_{2}\left\langle\chi_{1} | \chi_{2}\right\rangle+ c_{2} c_{1}\left\langle\chi_{2} | \chi_{1}\right\rangle+ c_{2}^{2}\left\langle \chi_{2}|\chi_{2}\right\rangle} \end{aligned}
+$$</p><p>If define
+$$
+H_{i j}=\left\langle\chi_{i}|\hat{H}| \chi_{j}\right\rangle
+\quad and \quad
+S_{i j}=\left\langle\chi_{i} | \chi_{j}\right\rangle
+\tag {Eq3}
+$$</p><p style=text-align:center;font-size:13px;font-family:times><span style=font-weight:700;color:red>Note: This is where H matrix (same to Fock matrix) and S matrix comes from!</span> We will come build these matrix at part 5.<br><p>and note that $H_{ij} = H_{j}$ and $S_{ij} = S_{ji}$ ,<p>$$
+E=\frac{c_{1}^{2} H_{11}+2 c_{1} c_{2} H_{12}+c_{2}^{2} H_{22}}{c_{1}^{2} S_{11}+2 c_{1} c_{2} S_{12}+c_{2}^{2} S_{22}}
+$$</p><p>$$
+E\left(c_{1}^{2} S_{11}+2 c_{1} c_{2} S_{12}+c_{2}^{2} S_{22}\right)=c_{1}^{2} H_{11}+2 c_{1} c_{2} H_{12}+c_{2}^{2} H_{22}
+$$</p><p>To minimize the energy with respect to c1 and c2, we require</p><p>$$
+\frac{\partial E}{\partial c_{1}}=0
+\quad and \quad
+\frac{\partial E}{\partial c_{2}}=0
+$$</p><p>If we differentiate the above equation through separately by c1 and c2 and apply this condition, we will end up with two equations in the two unknowns c1 and c2 , which we can solve to determine the coefficients and the energy.</p><p>$$
+\begin{array}{l}{E\left(2 c_{1} S_{11}+2 c_{2} S_{12}\right)=2 c_{1} H_{11}+2 c_{2} H_{12}} \ {E\left(2 c_{1} S_{12}+2 c_{2} S_{22}\right)=2 c_{1} H_{12}+2 c_{2} H_{22}}\end{array}
+$$</p><p>These are normally rewritten slightly, in the form
+$$
+\begin{array}{l}{c_{1}\left(H_{11}-E S_{11}\right)+c_{2}\left(H_{12}-E S_{12}\right)=0} \ {c_{1}\left(H_{12}-E S_{12}\right)+c_{2}\left(H_{22}-E S_{22}\right)=0}\end{array} \tag{Eq4}
+$$
+Write this in matrix form gives
+$$
+\left(\begin{array}{cc}{H_{11}-E S_{11}} & {H_{12}-E S_{12}} \ {H_{12}-E S_{12}} & {H_{22}-E S_{22}}\end{array}\right)\left(\begin{array}{c}{c_{1}} \ {c_{2}}\end{array}\right)=\left(\begin{array}{l}{0} \ {0}\end{array}\right)
+$$
+For the equations to have a solution, the determinant of the matrix must be equal to zero. Which means
+$$
+\left(H_{11}-E\right)\left(H_{22}-E\right)-\left(H_{12}-E S_{12}\right)^{2}=0
+$$
+Now, there is only one unkown variable E, solve the equation will commonly give us two E (eigenvalue).<br>And put this two E back to Eq4 will give us two set of (c1, c2), which corresponding to
+$$\phi_1 = c_{11} \chi_1 + c_{21} \chi_2 \quad (\varepsilon_{1})$$
+$$\phi_2 = c_{12} \chi_1 + c_{22} \chi_2 \quad (\varepsilon_{2})$$</p></details><p>Thanks for powerful scipy, secular equation could be solved simply by calling<br><code>eigenvalue, C = scipy.linalg.eigh(H, S)</code></p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=color:#75715e># H and S are calculated from next part</span>
+H <span style=color:#f92672>=</span> np<span style=color:#f92672>.</span>array([[<span style=color:#f92672>-</span><span style=color:#ae81ff>1.85073991</span>, <span style=color:#f92672>-</span><span style=color:#ae81ff>1.88346692</span>], 
+              [<span style=color:#f92672>-</span><span style=color:#ae81ff>1.88346692</span>, <span style=color:#f92672>-</span><span style=color:#ae81ff>1.58510327</span>]])
+S <span style=color:#f92672>=</span> np<span style=color:#f92672>.</span>array([[<span style=color:#ae81ff>1.</span>        , <span style=color:#ae81ff>0.83752358</span>],
+              [<span style=color:#ae81ff>0.83752358</span>, <span style=color:#ae81ff>1.</span>        ]])
+
+e, Co <span style=color:#f92672>=</span> scipy<span style=color:#f92672>.</span>linalg<span style=color:#f92672>.</span>eigh(H, S)
+
+<span style=color:#66d9ef>print</span>(e)
+<span style=color:#66d9ef>print</span>(Co)
+</code></pre></div><pre><code>[-1.97961968  1.03859384]
+[[-0.66167682  1.70635833]
+ [-0.37818627 -1.79065634]]
+</code></pre><p>Let&rsquo;s test if whether the eigenvalue and coefficient satisfy Eq4.<br>Note: <code>[-0.66167682, -0.37818627]</code> is the eigenvector corresponding to eigenvalue <code>-1.97961968</code><br><code>[1.70635833, -1.79065634]</code> is the eigenvector corresponding to eigenvalue <code>1.03859384</code><br>The result below $e^{-17}$ and $e^{-16}$ are so close to 0, there is no much difference with 0.</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python>tmp1 <span style=color:#f92672>=</span> Co[<span style=color:#ae81ff>0</span>, <span style=color:#ae81ff>0</span>] <span style=color:#f92672>*</span> (H[<span style=color:#ae81ff>0</span>, <span style=color:#ae81ff>0</span>] <span style=color:#f92672>-</span> e[<span style=color:#ae81ff>0</span>] <span style=color:#f92672>*</span> S[<span style=color:#ae81ff>0</span>, <span style=color:#ae81ff>0</span>]) <span style=color:#f92672>+</span> Co[<span style=color:#ae81ff>1</span>, <span style=color:#ae81ff>0</span>] <span style=color:#f92672>*</span> (H[<span style=color:#ae81ff>0</span>, <span style=color:#ae81ff>1</span>] <span style=color:#f92672>-</span> e[<span style=color:#ae81ff>0</span>] <span style=color:#f92672>*</span> S[<span style=color:#ae81ff>0</span>, <span style=color:#ae81ff>1</span>])
+tmp2 <span style=color:#f92672>=</span> Co[<span style=color:#ae81ff>0</span>, <span style=color:#ae81ff>1</span>] <span style=color:#f92672>*</span> (H[<span style=color:#ae81ff>0</span>, <span style=color:#ae81ff>1</span>] <span style=color:#f92672>-</span> e[<span style=color:#ae81ff>1</span>] <span style=color:#f92672>*</span> S[<span style=color:#ae81ff>0</span>, <span style=color:#ae81ff>1</span>]) <span style=color:#f92672>+</span> Co[<span style=color:#ae81ff>1</span>, <span style=color:#ae81ff>1</span>] <span style=color:#f92672>*</span> (H[<span style=color:#ae81ff>1</span>, <span style=color:#ae81ff>1</span>] <span style=color:#f92672>-</span> e[<span style=color:#ae81ff>1</span>] <span style=color:#f92672>*</span> S[<span style=color:#ae81ff>1</span>, <span style=color:#ae81ff>1</span>])
+<span style=color:#66d9ef>print</span>(tmp1)
+<span style=color:#66d9ef>print</span>(tmp2)
+</code></pre></div><pre><code>2.7755575615628914e-17
+8.881784197001252e-16
+</code></pre><h3 id=5-how-to-build-matrix>5. How to build matrix</h3><p><font color=red>Note:</font> To avoid confusion, letters <code>r</code>, <code>s</code>, <code>t</code>, <code>u</code> are used to label matrix element and the basis functions $\chi$, and the letters <code>i</code>, <code>j</code> are used to label the MOs $\phi$.</p><p>Back to Eq3, $H_{rs}$ in H matrix and $S_{rs}$ in S matrix are defined as
+$$
+H_{r s}=\left\langle\chi_{r}|\hat{H}| \chi_{s}\right\rangle
+\quad and \quad
+S_{r s}=\left\langle\chi_{r} | \chi_{s}\right\rangle
+$$</p><h4 style=color:#12a8f1>(a) Hamiltonian core matrix H</h4><p>Where Hamiltonian core operator $\hat H$ is
+$$\hat{H}^{\mathrm{core}}<em>i \equiv-\frac{1}{2} \nabla</em>{i}^{2}-\sum_{\alpha} \frac{Z_{\alpha}}{r_{i \alpha}}$$</p><p>$$H_{r s}=\left\langle\chi_{r}|\hat{H}| \chi_{s}\right\rangle
+\quad $$</p><p>$$=\int_{0}^\infty \chi_r \hat{H} \chi_s ; 4\pi r^2dr$$</p><p>$$= \int_{0}^\infty \chi_r ((-\dfrac{1}{2}) \nabla^2 -\sum_{\alpha} \frac{Z_{\alpha}}{r_{i \alpha}})\chi_s ; 4\pi r^2 dr$$</p><p>Where $
+{\text { Laplace operator: } \nabla^{2}} {=\frac{1}{r^{2}} \frac{\partial}{\partial r}\left(r^{2} \frac{\partial f}{\partial r}\right)=\frac{1}{r} \frac{\partial^{2}}{\partial r^{2}}(r f)}$
+(For wavefunction which only has radial part.)</p><p>And since we are calculating atom, there is only one nuclear $\alpha$</p><p>$$\therefore H_{rs}= \int_{0}^\infty \chi_r ((-\dfrac{1}{2}) \dfrac{1}{r} \dfrac{\partial}{\partial r} \dfrac{\partial}{\partial r} r \chi_s - \dfrac{Z_{\alpha}}{r} \chi_s )4\pi r^2 dr$$</p><p>Let&rsquo;s write this in sympy.<br>For easy reading, the code below seperate equation above into
+$ H_{rs}= \int_{0}^\infty \chi_r (T - V )4\pi r^2 dr$</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>H_int</span>(fr, fs, Z):
+    <span style=color:#e6db74>&#34;&#34;&#34;
+</span><span style=color:#e6db74>    Compute H_core integral between two STO functions.
+</span><span style=color:#e6db74>    H_core = electron kinetics energy + electron nuclear potential energy
+</span><span style=color:#e6db74>
+</span><span style=color:#e6db74>    INPUT:
+</span><span style=color:#e6db74>    Z: Nuclear charge
+</span><span style=color:#e6db74>    &#34;&#34;&#34;</span>
+    T <span style=color:#f92672>=</span> <span style=color:#f92672>-</span> ((<span style=color:#ae81ff>1</span> <span style=color:#f92672>/</span> <span style=color:#ae81ff>2</span>) <span style=color:#f92672>*</span> (<span style=color:#ae81ff>1</span> <span style=color:#f92672>/</span> r) <span style=color:#f92672>*</span> diff(diff(r <span style=color:#f92672>*</span> fs, r), r))
+    V <span style=color:#f92672>=</span> <span style=color:#f92672>-</span> (Z <span style=color:#f92672>/</span> r) <span style=color:#f92672>*</span> fs
+    <span style=color:#66d9ef>return</span> sp<span style=color:#f92672>.</span>integrate(fr <span style=color:#f92672>*</span> (T <span style=color:#f92672>+</span> V) <span style=color:#f92672>*</span> <span style=color:#ae81ff>4</span> <span style=color:#f92672>*</span> sp<span style=color:#f92672>.</span>pi <span style=color:#f92672>*</span> r <span style=color:#f92672>*</span> r, (r, <span style=color:#ae81ff>0</span>, <span style=color:#f92672>+</span>oo))
+</code></pre></div><p><code>H_int</code> function calculate $H_{rs}$ element in H matrix. To build H matrix, we just need to go over <code>r</code> from (1, 2, 3 &mldr; num_bfs), and go over <code>s</code> also from (1, 2, 3 &mldr; num_bfs), where <code>num_bfs</code> is number of basis functions, we will see this more at below.</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>H_matrix</span>(bfs, Z):
+    <span style=color:#e6db74>&#34;&#34;&#34;
+</span><span style=color:#e6db74>    Compute the core hamiltonian matrix H.
+</span><span style=color:#e6db74>    H_core = electron kinetics energy + electron nuclear potential energy
+</span><span style=color:#e6db74>
+</span><span style=color:#e6db74>    INPUT:
+</span><span style=color:#e6db74>        bfs: basis functions
+</span><span style=color:#e6db74>        Z: nuclear charge
+</span><span style=color:#e6db74>    OUTPUT:
+</span><span style=color:#e6db74>        H: core hamiltonian matrix
+</span><span style=color:#e6db74>    &#34;&#34;&#34;</span>
+    num_bfs <span style=color:#f92672>=</span> len(bfs)
+    H <span style=color:#f92672>=</span> np<span style=color:#f92672>.</span>zeros((num_bfs, num_bfs))
+
+    <span style=color:#66d9ef>for</span> r <span style=color:#f92672>in</span> range(num_bfs):
+        <span style=color:#66d9ef>for</span> s <span style=color:#f92672>in</span> range(num_bfs):
+            H[r, s] <span style=color:#f92672>=</span> H_int(bfs[r], bfs[s], Z)
+
+    <span style=color:#66d9ef>return</span> H
+</code></pre></div><h4 style=color:#12a8f1>(b) Overlap matrix S</h4><p>If you understand H matrix, S (Overlap) matrix will be very easy.</p><p>$$S_{rs} = \int_{0}^\infty \chi_r^* \chi_s ; 4 \pi r^2dr$$</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>S_int</span>(fr, fs):
+    <span style=color:#e6db74>&#34;&#34;&#34;
+</span><span style=color:#e6db74>    Compute overlap integral between two STO functions.
+</span><span style=color:#e6db74>    &#34;&#34;&#34;</span>
+    <span style=color:#66d9ef>return</span> sp<span style=color:#f92672>.</span>integrate(fr <span style=color:#f92672>*</span> fs <span style=color:#f92672>*</span> <span style=color:#ae81ff>4</span> <span style=color:#f92672>*</span> sp<span style=color:#f92672>.</span>pi <span style=color:#f92672>*</span> r <span style=color:#f92672>*</span> r, (r, <span style=color:#ae81ff>0</span>, <span style=color:#f92672>+</span>oo))
+</code></pre></div><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>S_matrix</span>(bfs):
+    <span style=color:#e6db74>&#34;&#34;&#34;
+</span><span style=color:#e6db74>    Compute overlap matrix S.
+</span><span style=color:#e6db74>
+</span><span style=color:#e6db74>    INPUT:
+</span><span style=color:#e6db74>        fs: basis functions
+</span><span style=color:#e6db74>    OUTPUT:
+</span><span style=color:#e6db74>        S: Overlap matrix
+</span><span style=color:#e6db74>    &#34;&#34;&#34;</span>
+    num_bfs <span style=color:#f92672>=</span> len(bfs)
+    S <span style=color:#f92672>=</span> np<span style=color:#f92672>.</span>zeros((num_bfs, num_bfs))
+
+    <span style=color:#66d9ef>for</span> r <span style=color:#f92672>in</span> range(num_bfs):
+        <span style=color:#66d9ef>for</span> s <span style=color:#f92672>in</span> range(num_bfs):
+            S[r, s] <span style=color:#f92672>=</span> S_int(bfs[r], bfs[s])
+
+    <span style=color:#66d9ef>return</span> S
+</code></pre></div><h4 style=color:#12a8f1>(c) Fock matrix F</h4><h4 style=color:#18b018>Fock matrix F = H matrix + G matrix</h4><p>Fock matrix could be generated similarly like H, where Fock operator is
+$$\hat{F}(i)=\hat{H}<em>{core}(i)+\sum</em>{j=1}^{n / 2}\left[2 \hat{J}<em>{j}(i)-\hat{K}</em>{j}(i)\right]$$</p><p>The second term is often denoted as $\hat G$.</p><p>$$\hat{F}(i)=\hat{H}_{core}(i)+\hat G$$</p><p>Because we already have <strong>H matrix</strong> above, so we only need to build <strong>G matrix</strong>, add them together will generate <strong>Fock matrix</strong>.</p><h4 style=color:#18b018>G matrix</h4><p>The defination of $J$ (Coulomb operator) and $K$ (exchange operator) are. (1) (2) below simple means they are different electron.</p><p>$$
+\begin{aligned} \hat{J}<em>{j}(1) f(1) &=f(1) \int\left|\phi</em>{j}(2)\right|^{2} \frac{1}{r_{12}} d v_{2} \ \hat{K}_{j}(1) f(1) &=\phi_{j}(1) \int \frac{\phi_{j}^{*}(2) f(2)}{r_{12}} d v_{2} \end{aligned}
+$$</p><p style=text-align:center;font-size:13px;font-family:times><span style=font-weight:700>Note:</span>
+${\displaystyle f(1)}$, ${\displaystyle f(2)}$ are the one-electron wavefunctions acted upon by the exchange operator as functions of the electron positions,<br>and ${\displaystyle \phi _{j}(1)}$ and ${\displaystyle \phi _{j}(2)}$ are the one-electron wavefunction of the jth electron as functions of the positions of the electrons.<br><p><p>Let&rsquo;s see the result first, we will walk through an example ($G_{12}$ of helium) below explain how to get here. (Basically, it&rsquo;s just expand $\phi_i$ into linear combination of the basis functions.)
+$$
+\left\langle\chi_{r}(1) | \hat{J}_{j}(1) \chi_{s}(1)\right\rangle=\sum_{t} \sum_{u} c_{t j}^{*} c_{u j} \iint \frac{\chi_{r}^{*}(1) \chi_{s}(1) \chi_{t}^{*}(2) \chi_{u}(2)}{r_{12}} d v_{1} d v_{2}
+$$
+$$
+\left\langle\chi_{r}(1) | \hat{K}_{j}(1) \chi_{s}(1)\right\rangle=\sum_{t} \sum_{u} c_{t j}^{*} c_{u j} \iint \frac{\chi_{r}^{*}(1) \chi_{u}(1) \chi_{t}^{*}(2) \chi_{s}(2)}{r_{12}} d v_{1} d v_{2}
+$$
+If define</p><p>$$
+(r s | t u) \equiv \iint \frac{\chi_{r}^{*}(1) \chi_{s}(1) \chi_{t}^{*}(2) \chi_{u}(2)}{r_{12}} d v_{1} d v_{2}
+$$</p><p>It could be rewritten as
+$$
+\left\langle\chi_{r}(1) | \hat{J}_{j}(1) \chi_{s}(1)\right\rangle=\sum_{t=1}^{b} \sum_{u=1}^{b} c_{t j}^{*} c_{u j}(r s | t u)
+$$</p><p>$$
+\left\langle\chi_{r}(1) | \hat{K}_{j}(1) \chi_{s}(1)\right\rangle=\sum_{t=1}^{b} \sum_{u=1}^{b} c_{t j}^{*} c_{u j}(r u | t s)
+$$
+And final $G_{rs}$ will be
+$$
+G_{r s}=\sum_{t=1}^{b} \sum_{u=1}^{b} \sum_{j=1}^{n / 2} c_{t j}^{*} c_{u j}[2(r s | t u)-(r u | t s)]
+$$</p><details><summary><span style=font-weight:700;color:red>Example:</span><br>Let's take $G_{12}$ element in G matrix (Helium atom) as an example to see how this comes out. (click to uncollapse)</summary><p>$$G_{r s}=\left\langle\chi_{r}|\hat{G}| \chi_{s}\right\rangle$$
+$$G_{1 2}=\left\langle\chi_{1}|\hat{G}| \chi_{2}\right\rangle$$</p><p>$$G_{1 2}= \sum_{j=1}^{n / 2} \left\langle\chi_{1}|2 \hat{J}_{j}(i)-\hat{K}_{j}(i)| \chi_{2}\right\rangle$$</p><p>For helium atom, num of electron (n) is 2, there is only one 1s orbital.</p><p>$$G_{1 2}= \left\langle\chi_{1}|2 \hat{J}_{j}(i)-\hat{K}_{j}(i)| \chi_{2}\right\rangle$$
+$$G_{1 2}= 2\left\langle\chi_{1}| \hat{J}_{j}(i)| \chi_{2}\right\rangle - \left\langle\chi_{1}|\hat{K}_{j}(i)| \chi_{2}\right\rangle$$</p><p>Let&rsquo;s do $\left\langle\chi_{1}| \hat{J}_{j}(i)| \chi_{2}\right\rangle$ first</p><p>$$\left\langle\chi_{1}(1)| \hat{J}_{1}| \chi_{2}(1)\right\rangle $$<br>$$= \left\langle\chi_{1}(1)| ;;; \int \frac{\left|\phi_1(2)\right|^{2}}{r_{12}} d v_{2} ;;; | \chi_{2}(1)\right\rangle $$<br>$$
+= \int \int \frac{\phi_1(2)^*\phi_1(2) \chi (1)^* \chi (1)}{r_{12}} d v_{2}d v_{1}
+$$</p><p>$$
+= \int \int \frac{[c_{11}\chi_{1}^*(2) + c_{21}\chi_{2}^*(2)][c_{11}\chi_{1}(2) + c_{21}\chi_{2}(2)] \chi (1)^* \chi (1)}{r_{12}} d v_{2}d v_{1}
+$$</p><p>$$
+= \int \int \frac{c_{11}\chi_{1}^*(2)c_{11}\chi_{1}(2) \chi (1)^* \chi (1)}{r_{12}} d v_{2}d v_{1}</p><ul><li>\int \int \frac{c_{11}\chi_{1}^*(2)c_{21}\chi_{2}(2) \chi (1)^* \chi (1)}{r_{12}} d v_{2}d v_{1}
+$$
+$$</li><li>\int \int \frac{c_{21}\chi_{2}^*(2)c_{11}\chi_{1}(2) \chi (1)^* \chi (1)}{r_{12}} d v_{2}d v_{1}</li><li>\int \int \frac{c_{21}\chi_{2}^*(2)c_{21}\chi_{2}(2) \chi (1)^* \chi (1)}{r_{12}} d v_{2}d v_{1}
+$$</li></ul><p>Use
+$
+(r s | t u) \equiv \iint \frac{\chi_{r}^{*}(1) \chi_{s}(1) \chi_{t}^{*}(2) \chi_{u}(2)}{r_{12}} d v_{1} d v_{2}
+$ to simplify the representation.</p><p>$$
+\left\langle\chi_{1}| \hat{J}_{j}(i)| \chi_{2}\right\rangle
+= c_{11}c_{11}(1 2 | 1 1) + c_{11}c_{21}(1 2 | 1 2) + c_{21}c_{11}(1 2 | 2 1) + c_{21}c_{21}(1 2 | 2 2)
+$$
+$$
+=\sum_{t=1}^{2} \sum_{u=1}^{2} \sum_{j=1}^{2 / 2} c_{t j}^{*} c_{u j} (1 ;2 | t ;u)
+$$</p><p>Similar $\left\langle\chi_{1}| \hat{K}_{j}(i)| \chi_{2}\right\rangle$ could also be inferred,
+$$
+\left\langle\chi_{1}| \hat{K}_{j}(i)| \chi_{2}\right\rangle
+= c_{11}c_{11}(1 1 | 1 2) + c_{11}c_{21}(1 2 | 1 2) + c_{21}c_{11}(1 1 | 2 2) + c_{21}c_{21}(1 2 | 2 2)
+$$
+$$
+=\sum_{t=1}^{2} \sum_{u=1}^{2} \sum_{j=1}^{2 / 2} c_{t j}^{*} c_{u j} (1 ;u | t ;2)
+$$</p><p>So $G_{1 2}$ is
+$$G_{1 2}= \left\langle\chi_{1}|2 \hat{J}_{j}(i)-\hat{K}_{j}(i)| \chi_{2}\right\rangle$$
+$$
+=\sum_{t=1}^{2} \sum_{u=1}^{2} \sum_{j=1}^{2 / 2} c_{t j}^{*} c_{u j}[2(1 ;2 | t ;u)-(1; u | t ;2)]
+$$</p></details><p>Build G matrix in python</p><p>recall $G_{rs}$ is
+$$
+G_{r s}=\sum_{t=1}^{b} \sum_{u=1}^{b} \sum_{j=1}^{n / 2} c_{t j}^{*} c_{u j}[2(r s | t u)-(r u | t s)]
+$$</p><p>If define $P_{rs}$ (density matrix) as
+$$
+P_{t u} \equiv 2 \sum_{j=1}^{n / 2} c_{t j}^{*} c_{u j}, \quad t=1,2, \ldots, b, \quad u=1,2, \ldots, b
+$$</p><p>Then $G_{rs}$ could be simplified again as
+$$
+G_{r s}=\sum_{t=1}^{b} \sum_{u=1}^{b} P_{t u}\left[(r s | t u)-\frac{1}{2}(r u | t s)\right]
+$$</p><p>If we built a matrix <strong>R</strong> which is 4 dimension, and save all the posible $(r s | t u)$, then we could build G matrix like below.</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>G_matrix</span>(P, R):
+    <span style=color:#e6db74>&#34;&#34;&#34;
+</span><span style=color:#e6db74>    Compute G matrix.
+</span><span style=color:#e6db74>    G =  coulombic repulsion energy + exchange energy
+</span><span style=color:#e6db74>
+</span><span style=color:#e6db74>    INPUT:
+</span><span style=color:#e6db74>        P: density matrix
+</span><span style=color:#e6db74>        R: electron repulsion matrix
+</span><span style=color:#e6db74>    OUTPUT:
+</span><span style=color:#e6db74>        G: repulsion matrix
+</span><span style=color:#e6db74>    &#34;&#34;&#34;</span>
+    num_bfs <span style=color:#f92672>=</span> P<span style=color:#f92672>.</span>shape[<span style=color:#ae81ff>0</span>]
+    G <span style=color:#f92672>=</span> np<span style=color:#f92672>.</span>zeros((num_bfs, num_bfs))
+
+    <span style=color:#66d9ef>for</span> r <span style=color:#f92672>in</span> range(num_bfs):
+        <span style=color:#66d9ef>for</span> s <span style=color:#f92672>in</span> range(num_bfs):
+            g <span style=color:#f92672>=</span> <span style=color:#ae81ff>0</span>
+            <span style=color:#66d9ef>for</span> t <span style=color:#f92672>in</span> range(num_bfs):
+                <span style=color:#66d9ef>for</span> u <span style=color:#f92672>in</span> range(num_bfs):
+                    int1 <span style=color:#f92672>=</span> R[r, s, t, u]
+                    int2 <span style=color:#f92672>=</span> R[r, u, t, s]
+                    g <span style=color:#f92672>+=</span> P[t, u] <span style=color:#f92672>*</span> (int1 <span style=color:#f92672>-</span> <span style=color:#ae81ff>0.5</span> <span style=color:#f92672>*</span> int2)
+            G[r, s] <span style=color:#f92672>=</span> g
+
+    <span style=color:#66d9ef>return</span> G
+</code></pre></div><h4 style=color:#18b018>P matrix</h4><p>And also P (density) matrix
+$$
+P_{t u} \equiv 2 \sum_{j=1}^{n / 2} c_{t j}^{*} c_{u j}, \quad t=1,2, \ldots, b, \quad u=1,2, \ldots, b
+$$</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>P_matrix</span>(Co, N):
+    <span style=color:#e6db74>&#34;&#34;&#34;
+</span><span style=color:#e6db74>    Compute density matrix P.
+</span><span style=color:#e6db74>
+</span><span style=color:#e6db74>    INPUT:
+</span><span style=color:#e6db74>        Co: coefficents matrix
+</span><span style=color:#e6db74>        N: num of electrons
+</span><span style=color:#e6db74>    OUTPUT:
+</span><span style=color:#e6db74>        P: repulsion matrix
+</span><span style=color:#e6db74>    &#34;&#34;&#34;</span>
+    P <span style=color:#f92672>=</span> np<span style=color:#f92672>.</span>zeros([Co<span style=color:#f92672>.</span>shape[<span style=color:#ae81ff>0</span>], Co<span style=color:#f92672>.</span>shape[<span style=color:#ae81ff>0</span>]])
+
+    <span style=color:#66d9ef>for</span> t <span style=color:#f92672>in</span> range(Co<span style=color:#f92672>.</span>shape[<span style=color:#ae81ff>0</span>]):
+        <span style=color:#66d9ef>for</span> u <span style=color:#f92672>in</span> range(Co<span style=color:#f92672>.</span>shape[<span style=color:#ae81ff>0</span>]):
+            <span style=color:#66d9ef>for</span> j <span style=color:#f92672>in</span> range(int(N<span style=color:#f92672>/</span><span style=color:#ae81ff>2</span>)):
+                P[t, u] <span style=color:#f92672>+=</span> <span style=color:#ae81ff>2</span> <span style=color:#f92672>*</span> Co[t, j] <span style=color:#f92672>*</span> Co[u, j]
+    <span style=color:#66d9ef>return</span> P
+</code></pre></div><h4 style=color:#18b018>R matrix</h4><p>R matrix (4 dimenstion), which is the most computation-expensive part in hartree-fock method. (In principle, there are a lot of elements in R matrix are equal by symmetry, but for code simplicity, we didn&rsquo;t implemented this.)</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>R_matrix</span>(bfs):
+    <span style=color:#e6db74>&#34;&#34;&#34;
+</span><span style=color:#e6db74>    Compute the electron repulsion integral matrix R.
+</span><span style=color:#e6db74>
+</span><span style=color:#e6db74>    INPUT:
+</span><span style=color:#e6db74>        fs: basis functions
+</span><span style=color:#e6db74>    OUTPUT:
+</span><span style=color:#e6db74>        R: repulsion matrix
+</span><span style=color:#e6db74>    &#34;&#34;&#34;</span>
+    start <span style=color:#f92672>=</span> time<span style=color:#f92672>.</span>time()
+    num_bfs <span style=color:#f92672>=</span> len(bfs)
+    R <span style=color:#f92672>=</span> np<span style=color:#f92672>.</span>zeros((num_bfs, num_bfs, num_bfs, num_bfs))
+
+    <span style=color:#66d9ef>for</span> r <span style=color:#f92672>in</span> range(num_bfs):
+        <span style=color:#66d9ef>for</span> s <span style=color:#f92672>in</span> range(num_bfs):
+            <span style=color:#66d9ef>for</span> t <span style=color:#f92672>in</span> range(num_bfs):
+                <span style=color:#66d9ef>for</span> u <span style=color:#f92672>in</span> range(num_bfs):
+                    R[r, s, t, u] <span style=color:#f92672>=</span> R_int([bfs[r], bfs[s], bfs[t], bfs[u]])
+
+    stop <span style=color:#f92672>=</span> time<span style=color:#f92672>.</span>time()
+    <span style=color:#66d9ef>print</span>(<span style=color:#e6db74>&#39;time Repu: {:.1f} s&#39;</span><span style=color:#f92672>.</span>format(stop<span style=color:#f92672>-</span>start))
+    <span style=color:#66d9ef>return</span> R
+</code></pre></div><p>Recall the element $R_{rstu}$ in R matrix is
+$$
+(r s | t u) \equiv \iint \frac{\chi_{r}^{*}(1) \chi_{s}(1) \chi_{t}^{*}(2) \chi_{u}(2)}{r_{12}} d v_{1} d v_{2}
+$$</p><p>For 1s or 2s orbital which only has radial part, this could be calculated approximately in sympy. However, for the orbitals which has angular part, how to solve two-electron Repulsion integral of Slater Type Orbital (STO) is still slow and difficult. This is the main reason why Gaussian Type Orbital (GTO) is more frequently used, and we will try GTO in next chapter.</p><p>$$(rs|tu) = \int_{0}^\infty \int_{0}^\infty \dfrac{\chi_r^*(1) \chi_s(1) \chi_t^*(2) \chi_u(2)}{r_{12}} ; 4 \pi r_1^2dr_1; 4 \pi r_2^2dr_2 $$</p><p>$$(rs|tu) = \int_{0}^\infty \chi_r^*(1) \chi_s(1) ; 4 \pi r_1^2dr_1\int_{0}^\infty \frac{ \chi_t^*(2) \chi_u(2)}{r_{12}}; 4 \pi r_2^2dr_2 $$</p><p>$r_{12}$ here is tricky to deal with, from problem 9.14 in quantum_chemistry by levine</p><p>$$(rs|tu) = \int_{0}^\infty \chi_r^*(1) \chi_s(1) ; 4 \pi r_1^2dr_1\int_{0}^\infty \frac{ \chi_t^*(2) \chi_u(2)}{r_{>}}; 4 \pi r_2^2dr_2 $$</p><p style=text-align:center;font-size:13px;font-family:times><span style=font-weight:700>Note:</span>
+$r_{>}$ is the larger one between $r1$ and $r2$<br><p>$$(rs|tu) = \int_{0}^\infty \chi_r^*(1) \chi_s(1) \; 4 \pi r_1^2dr_1(\int_{0}^{r_1} \frac{ \chi_t^*(2) \chi_u(2)}{r_{1}}\; 4 \pi r_2^2dr_2 + \int_{r_1}^\infty \frac{ \chi_t^*(2) \chi_u(2)}{r_{2}}\; 4 \pi r_2^2dr_2) $$<p>Let$ ; B= \int_{0}^{r_1} \frac{ \chi_t^*(2) \chi_u(2)}{r_{1}}; 4 \pi r_2^2dr_2 + \int_{r_1}^\infty \frac{ \chi_t^*(2) \chi_u(2)}{r_{2}}; 4 \pi r_2^2dr_2$</p><p>$$(rs|tu) = \int_{0}^\infty \chi_r^*(1) \chi_s(1) B ; 4 \pi r_1^2 dr_1 $$</p><p>So the element $R_{rstu}$ in R matrix could be calculated by</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>R_int</span>(four_bfs):
+    <span style=color:#e6db74>&#34;&#34;&#34;
+</span><span style=color:#e6db74>    Compute electron-electron repulsion integral.
+</span><span style=color:#e6db74>
+</span><span style=color:#e6db74>    INPUT:
+</span><span style=color:#e6db74>    four_bfs: an array contain 4 basis functions
+</span><span style=color:#e6db74>    &#34;&#34;&#34;</span>
+    f1, f2, f3, f4 <span style=color:#f92672>=</span> four_bfs
+
+    f1 <span style=color:#f92672>=</span> f1<span style=color:#f92672>.</span>subs(r, r1)
+    f2 <span style=color:#f92672>=</span> f2<span style=color:#f92672>.</span>subs(r, r1)
+    f3 <span style=color:#f92672>=</span> f3<span style=color:#f92672>.</span>subs(r, r2)
+    f4 <span style=color:#f92672>=</span> f4<span style=color:#f92672>.</span>subs(r, r2)
+
+    B <span style=color:#f92672>=</span> (<span style=color:#ae81ff>1</span> <span style=color:#f92672>/</span> r1) <span style=color:#f92672>*</span> sp<span style=color:#f92672>.</span>integrate(f3 <span style=color:#f92672>*</span> f4 <span style=color:#f92672>*</span> <span style=color:#ae81ff>4</span> <span style=color:#f92672>*</span> sp<span style=color:#f92672>.</span>pi <span style=color:#f92672>*</span> r2 <span style=color:#f92672>*</span> r2, (r2, <span style=color:#ae81ff>0</span>, r1)) <span style=color:#f92672>+</span> sp<span style=color:#f92672>.</span>integrate((<span style=color:#ae81ff>1</span> <span style=color:#f92672>/</span> r2) <span style=color:#f92672>*</span> f3 <span style=color:#f92672>*</span> f4 <span style=color:#f92672>*</span> <span style=color:#ae81ff>4</span> <span style=color:#f92672>*</span> sp<span style=color:#f92672>.</span>pi <span style=color:#f92672>*</span> r2 <span style=color:#f92672>*</span> r2, (r2, r1, <span style=color:#f92672>+</span>oo))
+    <span style=color:#66d9ef>return</span> sp<span style=color:#f92672>.</span>integrate(f1 <span style=color:#f92672>*</span> f2 <span style=color:#f92672>*</span> <span style=color:#ae81ff>4</span> <span style=color:#f92672>*</span> sp<span style=color:#f92672>.</span>pi <span style=color:#f92672>*</span> r1 <span style=color:#f92672>*</span> r1 <span style=color:#f92672>*</span> B, (r1, <span style=color:#ae81ff>0</span>, <span style=color:#f92672>+</span>oo))
+</code></pre></div><p>This is basically all the matrixes we will need to use, and <font color=red>we already solved the most difficult part of hartree fock!!</font></p><h3 id=6-secular-equation>6. Secular Equation</h3><p><strong>Fock matrix</strong> is the sum of <strong>H matrix</strong> and <strong>G matrix</strong>.<br>F = H + G</p><p>Then, Roothan equation could be solved simply by calling<br><code>eigenvalue, C = scipy.linalg.eigh(F, S)</code><br>eigenvalues are MO orbital energies.</p><p>$${\mathbf {F}}{\mathbf {C}}={\mathbf {S}}{\mathbf {C}}{\mathbf {\epsilon }}$$</p><p style=text-align:center;font-size:13px;font-family:times><span style=font-weight:700>Note:</span>
+F (Fock matrix), S (Overlap matrix) are inputs.<br>S matrix is fixed, F matrix is changing every iteration because of the improved C.<br>C (Coefficient matrix) and $\epsilon_i$ (eigenvalues) are results.<br><p><p>We could wrap <code>scipy.linalg.eigh</code> into a function</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>secular_eqn</span>(F, S):
+    <span style=color:#e6db74>&#34;&#34;&#34;
+</span><span style=color:#e6db74>    Slove secular equation, return the MO energies (eigenvalue) and improved coeffients (eigenvector)
+</span><span style=color:#e6db74>
+</span><span style=color:#e6db74>    INPUT:
+</span><span style=color:#e6db74>        F: fock matrix or h_core matrix
+</span><span style=color:#e6db74>        S: overlap integral
+</span><span style=color:#e6db74>    OUTPUT:
+</span><span style=color:#e6db74>        ei: eigenvalue
+</span><span style=color:#e6db74>        C: eigenvector
+</span><span style=color:#e6db74>    &#34;&#34;&#34;</span>
+    ei, C <span style=color:#f92672>=</span> scipy<span style=color:#f92672>.</span>linalg<span style=color:#f92672>.</span>eigh(F, S)
+    <span style=color:#66d9ef>return</span> ei, C
+</code></pre></div><h3 id=7-total-energy>7. Total Energy</h3><p>Finally, hartree fock total energy is
+$$
+E_{\mathrm{HF}}=2 \sum_{i=1}^{n / 2} \varepsilon_{i}-\sum_{i=1}^{n / 2} \sum_{j=1}^{n / 2}\left(2 J_{i j}-K_{i j}\right)+V_{N N}
+$$</p><p style=text-align:center;font-size:13px;font-family:times><span style=font-weight:700;color:red>Note:</span>
+i, j are electron (only r, s, t, u are used for matrix element)<br><p><p>Where every term is</p><ol><li>Energy of all the electrons (in closed shell condition, every orbital is doubly-occupied)</li><li>Recall that when we build F operator and calculat electron energy, electron-electron repulsion is counted twice when you sum all the electrons energy. This is the remove the extra count.</li><li>Nuclear-Nuclear repulsion term, which is not included in F operator. (because we are calculating Atom, this term is always 0)</li></ol><p>half sum of the all the electrons $({n / 2})$ could also be written as
+$$
+\sum_{i=1}^{n / 2} \varepsilon_{i}=\sum_{i=1}^{n / 2} H_{i i}^{\mathrm{core}}+\sum_{i=1}^{n / 2} \sum_{j=1}^{n / 2}\left(2 J_{i j}-K_{i j}\right)
+$$</p><p>So $E_{\mathrm{HF}}$ could be simplifed as
+$$
+E_{\mathrm{HF}}=\sum_{i=1}^{n / 2} \varepsilon_{i}+\sum_{i=1}^{n / 2} H_{i i}^{\mathrm{core}}+V_{N N}
+$$</p><p style=text-align:center;font-size:13px;font-family:times><span style=font-weight:700;color:red>Note:</span>
+i, j are electron (only r, s, t, u are used for matrix element)<br>H here is not H matrix, which is $
+H_{i i}^{\text {core }}=\left\langle\phi_{i}\left|\hat{H}^{\text {core }}\right| \phi_{i}\right\rangle
+$<br><p><p>Expand $\phi_{i}$ into basis functions and simplify, we could calculate total energy using the matrix we have built before.
+$$
+E_{\mathrm{HF}}=\sum_{i=1}^{n / 2} \varepsilon_{i}+\frac{1}{2} \sum_{r=1}^{b} \sum_{s=1}^{b} P_{r s} H_{r s}^{\mathrm{core}}+V_{N N}
+$$</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>energy_tot</span>(e, N, P, H, Vnn<span style=color:#f92672>=</span><span style=color:#ae81ff>0</span>):
+    <span style=color:#e6db74>&#34;&#34;&#34;
+</span><span style=color:#e6db74>    Compute the total energy.
+</span><span style=color:#e6db74>
+</span><span style=color:#e6db74>    INPUT:
+</span><span style=color:#e6db74>    e: MO energies
+</span><span style=color:#e6db74>    N: num of electrons
+</span><span style=color:#e6db74>    P: density matrix
+</span><span style=color:#e6db74>    H: h_core matrix
+</span><span style=color:#e6db74>    Vnn: nuclear nuclear repulsion energy, for atom is 0
+</span><span style=color:#e6db74>    &#34;&#34;&#34;</span>
+    e_tot <span style=color:#f92672>=</span> <span style=color:#ae81ff>0</span>
+
+    <span style=color:#66d9ef>for</span> i <span style=color:#f92672>in</span> range(int(N<span style=color:#f92672>/</span><span style=color:#ae81ff>2</span>)):
+        e_tot <span style=color:#f92672>+=</span> e[i]<span style=color:#f92672>.</span>real
+
+    e_tot <span style=color:#f92672>=</span> e_tot <span style=color:#f92672>+</span> <span style=color:#ae81ff>0.5</span> <span style=color:#f92672>*</span> (P <span style=color:#f92672>*</span> H)<span style=color:#f92672>.</span>sum() <span style=color:#f92672>+</span> Vnn
+    <span style=color:#66d9ef>return</span> e_tot
+</code></pre></div><h3 id=8-utils>8. Utils</h3><p>And also some utils function to print information and compare our result with reference</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>print_info</span>(S, H, e, Co, P, hf_e, start, stop, delta_e<span style=color:#f92672>=</span><span style=color:#ae81ff>0</span>, verbose<span style=color:#f92672>=</span>False):
+    <span style=color:#e6db74>&#34;&#34;&#34;
+</span><span style=color:#e6db74>    Print information while doing SCF interations.
+</span><span style=color:#e6db74>    &#34;&#34;&#34;</span>
+    <span style=color:#66d9ef>if</span>(verbose):
+        <span style=color:#75715e># overlap</span>
+        <span style=color:#66d9ef>print</span>(<span style=color:#e6db74>&#39;Overlap:&#39;</span>)
+        <span style=color:#66d9ef>print</span>(S)
+
+        <span style=color:#75715e># hamiltonian</span>
+        <span style=color:#66d9ef>print</span>(<span style=color:#e6db74>&#39;Core hamiltonian:&#39;</span>)
+        <span style=color:#66d9ef>print</span>(H)
+
+        <span style=color:#75715e># Co</span>
+        <span style=color:#66d9ef>print</span>(<span style=color:#e6db74>&#39;Coefficients:&#39;</span>)
+        <span style=color:#66d9ef>print</span>(Co)
+
+        <span style=color:#75715e># density</span>
+        <span style=color:#66d9ef>print</span>(<span style=color:#e6db74>&#39;Density matrix:&#39;</span>)
+        <span style=color:#66d9ef>print</span>(P)
+
+        <span style=color:#75715e># MOs</span>
+        <span style=color:#66d9ef>print</span>(<span style=color:#e6db74>&#39;MO energies:&#39;</span>)
+        message <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;, &#39;</span>
+        m_list <span style=color:#f92672>=</span> [<span style=color:#e6db74>&#39;e{} = {:0.3f}&#39;</span><span style=color:#f92672>.</span>format(i<span style=color:#f92672>+</span><span style=color:#ae81ff>1</span>, x) <span style=color:#66d9ef>for</span> i, x <span style=color:#f92672>in</span> enumerate(e)]
+        message <span style=color:#f92672>=</span> message<span style=color:#f92672>.</span>join(m_list)
+        <span style=color:#66d9ef>print</span>(message)
+
+    <span style=color:#66d9ef>print</span>(<span style=color:#e6db74>&#39;HF energy: {:0.5f} (hartree) = {:0.5f} (eV)&#39;</span><span style=color:#f92672>.</span>format(hf_e, hf_e<span style=color:#f92672>*</span><span style=color:#ae81ff>27.211</span>))
+    <span style=color:#66d9ef>if</span> delta_e <span style=color:#f92672>!=</span> <span style=color:#ae81ff>0</span>:
+        <span style=color:#66d9ef>print</span>(<span style=color:#e6db74>&#39;dE       : {:.2e}&#39;</span><span style=color:#f92672>.</span>format(delta_e))
+    <span style=color:#66d9ef>print</span>(<span style=color:#e6db74>&#39;time used: {:.1f} s&#39;</span><span style=color:#f92672>.</span>format(stop<span style=color:#f92672>-</span>start))
+
+
+<span style=color:#66d9ef>def</span> <span style=color:#a6e22e>compare</span>(cal, ref, tol<span style=color:#f92672>=</span><span style=color:#ae81ff>1.0e-4</span>):
+    <span style=color:#e6db74>&#34;&#34;&#34;
+</span><span style=color:#e6db74>    Compare calculated result with reference data.
+</span><span style=color:#e6db74>    &#34;&#34;&#34;</span>
+    delta <span style=color:#f92672>=</span> np<span style=color:#f92672>.</span>abs(ref <span style=color:#f92672>-</span> cal)
+    <span style=color:#66d9ef>if</span> delta <span style=color:#f92672>&lt;</span> tol:
+        message <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;</span><span style=color:#ae81ff>\33</span><span style=color:#e6db74>[32m&#39;</span> <span style=color:#f92672>+</span> <span style=color:#e6db74>&#39;PASSED&#39;</span> <span style=color:#f92672>+</span> <span style=color:#e6db74>&#39;</span><span style=color:#ae81ff>\x1b</span><span style=color:#e6db74>[0m&#39;</span>
+    <span style=color:#66d9ef>else</span>:
+        message <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;</span><span style=color:#ae81ff>\033</span><span style=color:#e6db74>[91m&#39;</span> <span style=color:#f92672>+</span> <span style=color:#e6db74>&#39;FAILED&#39;</span> <span style=color:#f92672>+</span> <span style=color:#e6db74>&#39;</span><span style=color:#ae81ff>\033</span><span style=color:#e6db74>[0m&#39;</span>
+    <span style=color:#66d9ef>print</span>(<span style=color:#e6db74>&#39;-&#39;</span> <span style=color:#f92672>*</span> <span style=color:#ae81ff>32</span>, message, <span style=color:#e6db74>&#39;-&#39;</span> <span style=color:#f92672>*</span> <span style=color:#ae81ff>33</span>)
+    <span style=color:#66d9ef>print</span>(<span style=color:#e6db74>&#39;cal: {:.7f}, ref: {:.7f}</span><span style=color:#ae81ff>\n\n</span><span style=color:#e6db74>&#39;</span><span style=color:#f92672>.</span>format(cal, ref))
+</code></pre></div><h3 id=9-run-hartree-fock>9. Run Hartree Fock</h3><p>Steps to run hartree fock</p><ol><li>Initialization</li></ol><ul><li>Let Fock matrix = H_core matrix, without considering electron repulsion</li><li>Solve secular equation with H and S to get initial Co (means initial guessed molecular orbitals) and build inital P (density) matrix</li><li>Prepare Repulsion matrix R (take time)</li></ul><ol start=2><li>Iteration</li></ol><ul><li>Using P matrix and R matrix to calculate G matrix</li><li>F matrix = H matrix + G matrix</li><li>Solve secular equation with F and S to get improved Co (means improved molecular orbitals)</li><li>Using improved Co to build improved P matrix</li><li>check whether converged (the change of total energy smaller than converge requirement)</li></ul><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>run_hf</span>(bfs, Z):
+    <span style=color:#e6db74>&#34;&#34;&#34;
+</span><span style=color:#e6db74>    Run restricted hartree fock for a single atom.
+</span><span style=color:#e6db74>
+</span><span style=color:#e6db74>    INPUT:
+</span><span style=color:#e6db74>        bfs: basis functions
+</span><span style=color:#e6db74>        Z: nuclear charge of the atom
+</span><span style=color:#e6db74>    &#34;&#34;&#34;</span>
+    <span style=color:#66d9ef>print</span>(<span style=color:#e6db74>&#39;------------------------------&#39;</span>, <span style=color:#e6db74>&#34;Initialization&#34;</span>, <span style=color:#e6db74>&#39;------------------------------&#39;</span>)
+    <span style=color:#66d9ef>print</span>(<span style=color:#e6db74>&#39;-------------------------&#39;</span>, <span style=color:#e6db74>&#34;Ignore repulsion integral&#34;</span>, <span style=color:#e6db74>&#39;------------------------&#39;</span>)
+    N <span style=color:#f92672>=</span> Z  <span style=color:#75715e># num of electron = nuclear charege (since it&#39;s atom)</span>
+    start <span style=color:#f92672>=</span> time<span style=color:#f92672>.</span>time()
+
+    <span style=color:#75715e># initialization</span>
+    H <span style=color:#f92672>=</span> H_matrix(bfs, Z)
+    S <span style=color:#f92672>=</span> S_matrix(bfs)
+    e, Co <span style=color:#f92672>=</span> secular_eqn(H, S)
+    P <span style=color:#f92672>=</span> P_matrix(Co, N)
+    Vnn <span style=color:#f92672>=</span> <span style=color:#ae81ff>0</span>  <span style=color:#75715e># A single atom does not have nuclear repulsion</span>
+    hf_e <span style=color:#f92672>=</span> energy_tot(e, N, P, H, Vnn)
+
+    stop <span style=color:#f92672>=</span> time<span style=color:#f92672>.</span>time()
+    print_info(S, H, e, Co, P, hf_e, start, stop, verbose<span style=color:#f92672>=</span>verbose)
+    <span style=color:#66d9ef>print</span>(<span style=color:#e6db74>&#39;-----------&#39;</span>, <span style=color:#e6db74>&#34;Caculating Electron Repulsion Integral (takes time)&#34;</span>, <span style=color:#e6db74>&#39;------------&#39;</span>)
+    R <span style=color:#f92672>=</span> R_matrix(bfs)
+    delta_e <span style=color:#f92672>=</span> <span style=color:#ae81ff>1</span>
+    ITER <span style=color:#f92672>=</span> <span style=color:#ae81ff>0</span>
+    previous_e <span style=color:#f92672>=</span> hf_e
+
+    <span style=color:#75715e># Iterations</span>
+    <span style=color:#66d9ef>while</span>(delta_e <span style=color:#f92672>&gt;</span> E_conv <span style=color:#f92672>and</span> ITER <span style=color:#f92672>&lt;</span> MAXITER):
+        <span style=color:#66d9ef>print</span>(<span style=color:#e6db74>&#39;------------------------------&#39;</span>, <span style=color:#e6db74>&#34;Iteration&#34;</span>, ITER <span style=color:#f92672>+</span> <span style=color:#ae81ff>1</span>, <span style=color:#e6db74>&#39;------------------------------&#39;</span>)
+        start <span style=color:#f92672>=</span> time<span style=color:#f92672>.</span>time()
+
+        <span style=color:#75715e># important scf steps</span>
+        G <span style=color:#f92672>=</span> G_matrix(P, R)
+        F <span style=color:#f92672>=</span> H <span style=color:#f92672>+</span> G
+        e, Co <span style=color:#f92672>=</span> secular_eqn(F, S)
+        P <span style=color:#f92672>=</span> P_matrix(Co, N)
+        hf_e <span style=color:#f92672>=</span> energy_tot(e, N, P, H, Vnn)
+
+        delta_e <span style=color:#f92672>=</span> np<span style=color:#f92672>.</span>abs(hf_e <span style=color:#f92672>-</span> previous_e)
+        previous_e <span style=color:#f92672>=</span> hf_e
+        ITER <span style=color:#f92672>+=</span> <span style=color:#ae81ff>1</span>
+        stop <span style=color:#f92672>=</span> time<span style=color:#f92672>.</span>time()
+        print_info(S, H, e, Co, P, hf_e, start, stop, delta_e, verbose<span style=color:#f92672>=</span>verbose)
+
+    <span style=color:#66d9ef>return</span> hf_e
+</code></pre></div><p>Set converge criterion</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python>MAXITER <span style=color:#f92672>=</span> <span style=color:#ae81ff>40</span>     <span style=color:#75715e># Maximum SCF iterations</span>
+E_conv <span style=color:#f92672>=</span> <span style=color:#ae81ff>1.0e-6</span>  <span style=color:#75715e># Energy convergence criterion</span>
+verbose <span style=color:#f92672>=</span> False  <span style=color:#75715e># whether to print matrix information while iterating</span>
+</code></pre></div><h3 id=10-test>10. Test</h3><h4 style=color:#12a8f1>Run hartree fock for Helium</h4><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>test1</span>():
+    <span style=color:#75715e># Use 2 Slater Type ourbital to represent Helium 1s orbital.</span>
+    <span style=color:#75715e># The final Helium 1s orbital is a linear combination of these two STO.</span>
+    f1s_1 <span style=color:#f92672>=</span> STO(zeta<span style=color:#f92672>=</span><span style=color:#ae81ff>1.45363</span>, n<span style=color:#f92672>=</span><span style=color:#ae81ff>1</span>)
+    f1s_2 <span style=color:#f92672>=</span> STO(zeta<span style=color:#f92672>=</span><span style=color:#ae81ff>2.91093</span>, n<span style=color:#f92672>=</span><span style=color:#ae81ff>1</span>)
+
+    <span style=color:#75715e># all basis functions</span>
+    fs <span style=color:#f92672>=</span> [f1s_1, f1s_2]
+
+    <span style=color:#75715e>#  nuclear charge of He</span>
+    Z <span style=color:#f92672>=</span> <span style=color:#ae81ff>2</span>
+
+    <span style=color:#75715e># run hartree fock</span>
+    hf_e <span style=color:#f92672>=</span> run_hf(fs, Z)
+
+    <span style=color:#75715e># compare result with reference</span>
+    ref_hf_e <span style=color:#f92672>=</span> <span style=color:#f92672>-</span><span style=color:#ae81ff>2.8616726</span>
+    compare(hf_e, ref_hf_e)
+</code></pre></div><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python>test1()
+</code></pre></div><pre><code>------------------------------ Initialization ------------------------------
+------------------------- Ignore repulsion integral ------------------------
+HF energy: -3.95924 (hartree) = -107.73486 (eV)
+time used: 0.2 s
+----------- Caculating Electron Repulsion Integral (takes time) ------------
+time Repu: 3.2 s
+------------------------------ Iteration 1 ------------------------------
+HF energy: -2.78457 (hartree) = -75.77099 (eV)
+dE       : 1.17e+00
+time used: 0.0 s
+------------------------------ Iteration 2 ------------------------------
+HF energy: -2.85860 (hartree) = -77.78532 (eV)
+dE       : 7.40e-02
+time used: 0.0 s
+------------------------------ Iteration 3 ------------------------------
+HF energy: -2.86152 (hartree) = -77.86490 (eV)
+dE       : 2.92e-03
+time used: 0.0 s
+------------------------------ Iteration 4 ------------------------------
+HF energy: -2.86167 (hartree) = -77.86877 (eV)
+dE       : 1.42e-04
+time used: 0.0 s
+------------------------------ Iteration 5 ------------------------------
+HF energy: -2.86167 (hartree) = -77.86896 (eV)
+dE       : 7.01e-06
+time used: 0.0 s
+------------------------------ Iteration 6 ------------------------------
+HF energy: -2.86167 (hartree) = -77.86897 (eV)
+dE       : 3.45e-07
+time used: 0.0 s
+---------------------------- PASSED --------------------------------
+cal: -2.8616726, ref: -2.8616726
+</code></pre><h4 style=color:#12a8f1>Run hartree fock for Beryllium</h4><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>test2</span>():
+    <span style=color:#e6db74>&#34;&#34;&#34;
+</span><span style=color:#e6db74>    Test of Be (1s, 2s)
+</span><span style=color:#e6db74>    &#34;&#34;&#34;</span>
+    <span style=color:#75715e># Use 2 STO to represent Be 1s orbital and another 2 STO for 2s orbital</span>
+    <span style=color:#75715e># The final 1s orbital is a linear combination of these 4 STO.</span>
+    <span style=color:#75715e># Same for 2s orbital.</span>
+    f1s_1 <span style=color:#f92672>=</span> STO(zeta<span style=color:#f92672>=</span><span style=color:#ae81ff>5.59108</span>, n<span style=color:#f92672>=</span><span style=color:#ae81ff>1</span>)
+    f1s_2 <span style=color:#f92672>=</span> STO(zeta<span style=color:#f92672>=</span><span style=color:#ae81ff>3.35538</span>, n<span style=color:#f92672>=</span><span style=color:#ae81ff>1</span>)
+    f2s_1 <span style=color:#f92672>=</span> STO(zeta<span style=color:#f92672>=</span><span style=color:#ae81ff>1.01122</span>, n<span style=color:#f92672>=</span><span style=color:#ae81ff>2</span>)
+    f2s_2 <span style=color:#f92672>=</span> STO(zeta<span style=color:#f92672>=</span><span style=color:#ae81ff>0.61000</span>, n<span style=color:#f92672>=</span><span style=color:#ae81ff>2</span>)
+
+    <span style=color:#75715e># all basis functions</span>
+    fs <span style=color:#f92672>=</span> [f1s_1, f1s_2, f2s_1, f2s_2]
+
+    <span style=color:#75715e># nuclear charge of Be</span>
+    Z <span style=color:#f92672>=</span> <span style=color:#ae81ff>4</span>
+
+    <span style=color:#75715e># run hartree fock</span>
+    hf_e <span style=color:#f92672>=</span> run_hf(fs, Z)
+
+    <span style=color:#75715e># compare result with reference</span>
+    ref_hf_e <span style=color:#f92672>=</span> <span style=color:#f92672>-</span><span style=color:#ae81ff>14.572369</span>
+    compare(hf_e, ref_hf_e)
+</code></pre></div><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python>test2()
+</code></pre></div><pre><code>------------------------------ Initialization ------------------------------
+------------------------- Ignore repulsion integral ------------------------
+HF energy: -19.51846 (hartree) = -531.11686 (eV)
+time used: 1.0 s
+----------- Caculating Electron Repulsion Integral (takes time) ------------
+time Repu: 56.9 s
+------------------------------ Iteration 1 ------------------------------
+HF energy: -14.28744 (hartree) = -388.77544 (eV)
+dE       : 5.23e+00
+time used: 0.0 s
+------------------------------ Iteration 2 ------------------------------
+HF energy: -14.50425 (hartree) = -394.67518 (eV)
+dE       : 2.17e-01
+time used: 0.0 s
+------------------------------ Iteration 3 ------------------------------
+HF energy: -14.55105 (hartree) = -395.94867 (eV)
+dE       : 4.68e-02
+time used: 0.0 s
+------------------------------ Iteration 4 ------------------------------
+HF energy: -14.56616 (hartree) = -396.35976 (eV)
+dE       : 1.51e-02
+time used: 0.0 s
+------------------------------ Iteration 5 ------------------------------
+HF energy: -14.57061 (hartree) = -396.48075 (eV)
+dE       : 4.45e-03
+time used: 0.0 s
+------------------------------ Iteration 6 ------------------------------
+HF energy: -14.57187 (hartree) = -396.51521 (eV)
+dE       : 1.27e-03
+time used: 0.0 s
+------------------------------ Iteration 7 ------------------------------
+HF energy: -14.57223 (hartree) = -396.52493 (eV)
+dE       : 3.57e-04
+time used: 0.0 s
+------------------------------ Iteration 8 ------------------------------
+HF energy: -14.57233 (hartree) = -396.52766 (eV)
+dE       : 1.01e-04
+time used: 0.0 s
+------------------------------ Iteration 9 ------------------------------
+HF energy: -14.57236 (hartree) = -396.52843 (eV)
+dE       : 2.83e-05
+time used: 0.0 s
+------------------------------ Iteration 10 ------------------------------
+HF energy: -14.57237 (hartree) = -396.52865 (eV)
+dE       : 7.94e-06
+time used: 0.0 s
+------------------------------ Iteration 11 ------------------------------
+HF energy: -14.57237 (hartree) = -396.52871 (eV)
+dE       : 2.23e-06
+time used: 0.0 s
+------------------------------ Iteration 12 ------------------------------
+HF energy: -14.57237 (hartree) = -396.52872 (eV)
+dE       : 6.27e-07
+time used: 0.0 s
+---------------------------- PASSED --------------------------------
+cal: -14.5723687, ref: -14.5723690
+</code></pre><h3 id=11-excise---plot-the-charge-density-of-orbitals>11. Excise - Plot the charge density of orbitals</h3><p>Write a function based on the code of <code>run_hf()</code>, plot the charge density $4 \pi r^2 |\phi_i|^2$ of all the orbitals (final iteration).</p><p>For example, Beryllium:
+Note: You only need to plot the final one (most bottom)<br>Hint see below.
+<img src=https://file.newti.me/yyrcd/files/2019-11-18-HartreeFock.png alt></p><p>Hint: convert a sympy expression to python function by using <a href=https://docs.sympy.org/latest/modules/numeric-computation.html#lambdify>sp.lambdify()</a><br>For example, to plot $\chi_1$, which is the 1st wavefunction of Beryllium Basis set.</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python>f1s_1 <span style=color:#f92672>=</span> STO(zeta<span style=color:#f92672>=</span><span style=color:#ae81ff>5.59108</span>, n<span style=color:#f92672>=</span><span style=color:#ae81ff>1</span>)
+display(f1s_1)
+f <span style=color:#f92672>=</span> sp<span style=color:#f92672>.</span>lambdify(r, f1s_1, <span style=color:#e6db74>&#34;numpy&#34;</span>)
+</code></pre></div><p>$\displaystyle \frac{13.2203684670961 e^{- 5.59108 r}}{\sqrt{\pi}}$</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python>x <span style=color:#f92672>=</span> np<span style=color:#f92672>.</span>linspace(<span style=color:#ae81ff>0</span>, <span style=color:#ae81ff>5</span>, <span style=color:#ae81ff>300</span>)
+y <span style=color:#f92672>=</span> f(x)
+plt<span style=color:#f92672>.</span>figure(figsize<span style=color:#f92672>=</span>(<span style=color:#ae81ff>16</span>,<span style=color:#ae81ff>2</span>))
+plt<span style=color:#f92672>.</span>plot(x, y, label<span style=color:#f92672>=</span><span style=color:#e6db74>&#39;$\chi_{}$&#39;</span><span style=color:#f92672>.</span>format(<span style=color:#ae81ff>1</span>))
+plt<span style=color:#f92672>.</span>legend()
+plt<span style=color:#f92672>.</span>xlim(<span style=color:#ae81ff>0</span>, x[<span style=color:#f92672>-</span><span style=color:#ae81ff>1</span>])
+plt<span style=color:#f92672>.</span>xlabel(<span style=color:#e6db74>&#39;r&#39;</span>)
+plt<span style=color:#f92672>.</span>ylabel(<span style=color:#e6db74>&#39;$\chi_1$&#39;</span>)
+plt<span style=color:#f92672>.</span>title(<span style=color:#e6db74>&#39;Wavefunction of $\chi_1$&#39;</span>)
+plt<span style=color:#f92672>.</span>show()
+</code></pre></div><p><img src=/images/hartree-fock/1_Restricted_Hartree_Fock_for_Atom_57_0.png alt=png></p><p><font color=red>Code below is an example solution</font></p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>run_hf</span>(bfs, Z):
+    <span style=color:#e6db74>&#34;&#34;&#34;
+</span><span style=color:#e6db74>    Run restricted hartree fock for a single atom.
+</span><span style=color:#e6db74>
+</span><span style=color:#e6db74>    INPUT:
+</span><span style=color:#e6db74>        bfs: basis functions
+</span><span style=color:#e6db74>        Z: nuclear charge of the atom
+</span><span style=color:#e6db74>    &#34;&#34;&#34;</span>
+    <span style=color:#66d9ef>print</span>(<span style=color:#e6db74>&#39;------------------------------&#39;</span>, <span style=color:#e6db74>&#34;Initialization&#34;</span>, <span style=color:#e6db74>&#39;------------------------------&#39;</span>)
+    <span style=color:#66d9ef>print</span>(<span style=color:#e6db74>&#39;-------------------------&#39;</span>, <span style=color:#e6db74>&#34;Ignore repulsion integral&#34;</span>, <span style=color:#e6db74>&#39;------------------------&#39;</span>)
+    N <span style=color:#f92672>=</span> Z  <span style=color:#75715e># num of electron = nuclear charege (since it&#39;s atom)</span>
+    start <span style=color:#f92672>=</span> time<span style=color:#f92672>.</span>time()
+
+    <span style=color:#75715e># initialization</span>
+    H <span style=color:#f92672>=</span> H_matrix(bfs, Z)
+    S <span style=color:#f92672>=</span> S_matrix(bfs)
+    e, Co <span style=color:#f92672>=</span> secular_eqn(H, S)
+    P <span style=color:#f92672>=</span> P_matrix(Co, N)
+    Vnn <span style=color:#f92672>=</span> <span style=color:#ae81ff>0</span>  <span style=color:#75715e># A single atom does not have nuclear repulsion</span>
+    hf_e <span style=color:#f92672>=</span> energy_tot(e, N, P, H, Vnn)
+
+    stop <span style=color:#f92672>=</span> time<span style=color:#f92672>.</span>time()
+    print_info(S, H, e, Co, P, hf_e, start, stop, verbose<span style=color:#f92672>=</span>verbose)
+    <span style=color:#66d9ef>print</span>(<span style=color:#e6db74>&#39;-----------&#39;</span>, <span style=color:#e6db74>&#34;Caculating Electron Repulsion Integral (takes time)&#34;</span>, <span style=color:#e6db74>&#39;------------&#39;</span>)
+    R <span style=color:#f92672>=</span> R_matrix(bfs)
+    delta_e <span style=color:#f92672>=</span> <span style=color:#ae81ff>1</span>
+    ITER <span style=color:#f92672>=</span> <span style=color:#ae81ff>0</span>
+    previous_e <span style=color:#f92672>=</span> hf_e
+
+    densities <span style=color:#f92672>=</span> [] <span style=color:#75715e># [[d1, d2], [d1, d2], [d1, d2]]</span>
+    <span style=color:#75715e># plot </span>
+    x <span style=color:#f92672>=</span> np<span style=color:#f92672>.</span>linspace(<span style=color:#ae81ff>0</span>, <span style=color:#ae81ff>5</span>, <span style=color:#ae81ff>300</span>)
+    tmp_density <span style=color:#f92672>=</span> get_density(bfs, Co, x)
+    densities<span style=color:#f92672>.</span>append(tmp_density)
+
+    <span style=color:#75715e># Iterations</span>
+    <span style=color:#66d9ef>while</span>(delta_e <span style=color:#f92672>&gt;</span> E_conv <span style=color:#f92672>and</span> ITER <span style=color:#f92672>&lt;</span> MAXITER):
+        <span style=color:#66d9ef>print</span>(<span style=color:#e6db74>&#39;------------------------------&#39;</span>, <span style=color:#e6db74>&#34;Iteration&#34;</span>, ITER <span style=color:#f92672>+</span> <span style=color:#ae81ff>1</span>, <span style=color:#e6db74>&#39;------------------------------&#39;</span>)
+        start <span style=color:#f92672>=</span> time<span style=color:#f92672>.</span>time()
+
+        <span style=color:#75715e># important scf steps</span>
+        G <span style=color:#f92672>=</span> G_matrix(P, R)
+        F <span style=color:#f92672>=</span> H <span style=color:#f92672>+</span> G
+        e, Co <span style=color:#f92672>=</span> secular_eqn(F, S)
+        P <span style=color:#f92672>=</span> P_matrix(Co, N)
+        hf_e <span style=color:#f92672>=</span> energy_tot(e, N, P, H, Vnn)
+
+        delta_e <span style=color:#f92672>=</span> np<span style=color:#f92672>.</span>abs(hf_e <span style=color:#f92672>-</span> previous_e)
+        previous_e <span style=color:#f92672>=</span> hf_e
+        ITER <span style=color:#f92672>+=</span> <span style=color:#ae81ff>1</span>
+        stop <span style=color:#f92672>=</span> time<span style=color:#f92672>.</span>time()
+        print_info(S, H, e, Co, P, hf_e, start, stop, delta_e, verbose<span style=color:#f92672>=</span>verbose)
+
+        <span style=color:#75715e># plot</span>
+        tmp_density <span style=color:#f92672>=</span> get_density(bfs, Co, x)
+        densities<span style=color:#f92672>.</span>append(tmp_density)
+
+    plot_density(densities, x)
+
+
+    <span style=color:#66d9ef>return</span> hf_e
+</code></pre></div><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>get_density</span>(bfs, Co, x):
+    r <span style=color:#f92672>=</span> sp<span style=color:#f92672>.</span>Symbol(<span style=color:#e6db74>&#39;r&#39;</span>)
+    density <span style=color:#f92672>=</span> []
+    
+    <span style=color:#75715e># all orbitals</span>
+    <span style=color:#66d9ef>for</span> i <span style=color:#f92672>in</span> range(Co<span style=color:#f92672>.</span>shape[<span style=color:#ae81ff>0</span>]):
+        tmp_orbital <span style=color:#f92672>=</span> <span style=color:#ae81ff>0</span>
+        <span style=color:#75715e># all basis functions</span>
+        <span style=color:#66d9ef>for</span> j, f <span style=color:#f92672>in</span> enumerate(bfs):
+            tmp_orbital <span style=color:#f92672>+=</span> Co[j][i] <span style=color:#f92672>*</span> bfs[j]
+        tmp_d_function <span style=color:#f92672>=</span> tmp_orbital <span style=color:#f92672>*</span> tmp_orbital <span style=color:#f92672>*</span> r <span style=color:#f92672>*</span> r <span style=color:#f92672>*</span> <span style=color:#ae81ff>4</span> <span style=color:#f92672>*</span> np<span style=color:#f92672>.</span>pi
+        tmp_f <span style=color:#f92672>=</span> sp<span style=color:#f92672>.</span>lambdify(r, tmp_d_function, <span style=color:#e6db74>&#34;numpy&#34;</span>)
+        tmp_d <span style=color:#f92672>=</span> tmp_f(x)
+        density<span style=color:#f92672>.</span>append(tmp_d)
+    <span style=color:#66d9ef>return</span> density
+</code></pre></div><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>plot_density</span>(densities, x):
+    num_orbitals <span style=color:#f92672>=</span> len(densities[<span style=color:#ae81ff>0</span>])
+    num_iterations <span style=color:#f92672>=</span> len(densities)
+
+    <span style=color:#66d9ef>for</span> i <span style=color:#f92672>in</span> range(num_orbitals):
+        plt<span style=color:#f92672>.</span>figure(figsize<span style=color:#f92672>=</span>(<span style=color:#ae81ff>16</span>,<span style=color:#ae81ff>2</span>))
+        <span style=color:#66d9ef>for</span> j, d <span style=color:#f92672>in</span> enumerate(densities):
+            <span style=color:#66d9ef>if</span> j <span style=color:#f92672>==</span> <span style=color:#ae81ff>0</span> <span style=color:#f92672>or</span> j <span style=color:#f92672>==</span> (num_iterations <span style=color:#f92672>-</span> <span style=color:#ae81ff>1</span>):
+                plt<span style=color:#f92672>.</span>plot(x, d[i], label<span style=color:#f92672>=</span><span style=color:#e6db74>&#39;iteration {}&#39;</span><span style=color:#f92672>.</span>format(j<span style=color:#f92672>+</span><span style=color:#ae81ff>1</span>))
+            <span style=color:#66d9ef>else</span>:
+                plt<span style=color:#f92672>.</span>plot(x, d[i])
+        plt<span style=color:#f92672>.</span>legend()
+        plt<span style=color:#f92672>.</span>xlim(<span style=color:#ae81ff>0</span>, x[<span style=color:#f92672>-</span><span style=color:#ae81ff>1</span>])
+        plt<span style=color:#f92672>.</span>xlabel(<span style=color:#e6db74>&#39;r&#39;</span>)
+        plt<span style=color:#f92672>.</span>ylabel(<span style=color:#e6db74>&#39;$4 \pi r^2 |\phi_{}|^2$&#39;</span><span style=color:#f92672>.</span>format(i<span style=color:#f92672>+</span><span style=color:#ae81ff>1</span>))
+        plt<span style=color:#f92672>.</span>title(<span style=color:#e6db74>&#39;charge density of $\phi_{}$&#39;</span><span style=color:#f92672>.</span>format(i<span style=color:#f92672>+</span><span style=color:#ae81ff>1</span>))
+        plt<span style=color:#f92672>.</span>show()
+    
+    plt<span style=color:#f92672>.</span>figure(figsize<span style=color:#f92672>=</span>(<span style=color:#ae81ff>16</span>,<span style=color:#ae81ff>2</span>))
+    <span style=color:#66d9ef>for</span> i, d <span style=color:#f92672>in</span> enumerate(densities[<span style=color:#f92672>-</span><span style=color:#ae81ff>1</span>]):
+        plt<span style=color:#f92672>.</span>plot(x, d, label<span style=color:#f92672>=</span><span style=color:#e6db74>&#39;$\phi_{}$&#39;</span><span style=color:#f92672>.</span>format(i<span style=color:#f92672>+</span><span style=color:#ae81ff>1</span>))
+    plt<span style=color:#f92672>.</span>legend()
+    plt<span style=color:#f92672>.</span>xlim(<span style=color:#ae81ff>0</span>, x[<span style=color:#f92672>-</span><span style=color:#ae81ff>1</span>])
+    plt<span style=color:#f92672>.</span>xlabel(<span style=color:#e6db74>&#39;r&#39;</span>)
+    plt<span style=color:#f92672>.</span>ylabel(<span style=color:#e6db74>&#39;$4 \pi r^2 |\phi_i|^2$&#39;</span>)
+    plt<span style=color:#f92672>.</span>title(<span style=color:#e6db74>&#39;charge density of all orbitals $\phi_i$ (final iteration)&#39;</span>)
+    plt<span style=color:#f92672>.</span>show()
+</code></pre></div><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python>test1()
+</code></pre></div><pre><code>------------------------------ Initialization ------------------------------
+------------------------- Ignore repulsion integral ------------------------
+HF energy: -3.95924 (hartree) = -107.73486 (eV)
+time used: 0.2 s
+----------- Caculating Electron Repulsion Integral (takes time) ------------
+time Repu: 2.7 s
+------------------------------ Iteration 1 ------------------------------
+HF energy: -2.78457 (hartree) = -75.77099 (eV)
+dE       : 1.17e+00
+time used: 0.0 s
+------------------------------ Iteration 2 ------------------------------
+HF energy: -2.85860 (hartree) = -77.78532 (eV)
+dE       : 7.40e-02
+time used: 0.0 s
+------------------------------ Iteration 3 ------------------------------
+HF energy: -2.86152 (hartree) = -77.86490 (eV)
+dE       : 2.92e-03
+time used: 0.0 s
+------------------------------ Iteration 4 ------------------------------
+HF energy: -2.86167 (hartree) = -77.86877 (eV)
+dE       : 1.42e-04
+time used: 0.0 s
+------------------------------ Iteration 5 ------------------------------
+HF energy: -2.86167 (hartree) = -77.86896 (eV)
+dE       : 7.01e-06
+time used: 0.0 s
+------------------------------ Iteration 6 ------------------------------
+HF energy: -2.86167 (hartree) = -77.86897 (eV)
+dE       : 3.45e-07
+time used: 0.0 s
+</code></pre><p><img src=/images/hartree-fock/1_Restricted_Hartree_Fock_for_Atom_62_1.png alt=png></p><p><img src=/images/hartree-fock/1_Restricted_Hartree_Fock_for_Atom_62_2.png alt=png></p><p><img src=/images/hartree-fock/1_Restricted_Hartree_Fock_for_Atom_62_3.png alt=png></p><pre><code>---------------------------- PASSED --------------------------------
+cal: -2.8616726, ref: -2.8616726
+</code></pre><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python>test2()
+</code></pre></div><pre><code>------------------------------ Initialization ------------------------------
+------------------------- Ignore repulsion integral ------------------------
+HF energy: -19.51846 (hartree) = -531.11686 (eV)
+time used: 0.7 s
+----------- Caculating Electron Repulsion Integral (takes time) ------------
+time Repu: 52.7 s
+------------------------------ Iteration 1 ------------------------------
+HF energy: -14.28744 (hartree) = -388.77544 (eV)
+dE       : 5.23e+00
+time used: 0.0 s
+------------------------------ Iteration 2 ------------------------------
+HF energy: -14.50425 (hartree) = -394.67518 (eV)
+dE       : 2.17e-01
+time used: 0.0 s
+------------------------------ Iteration 3 ------------------------------
+HF energy: -14.55105 (hartree) = -395.94867 (eV)
+dE       : 4.68e-02
+time used: 0.0 s
+------------------------------ Iteration 4 ------------------------------
+HF energy: -14.56616 (hartree) = -396.35976 (eV)
+dE       : 1.51e-02
+time used: 0.0 s
+------------------------------ Iteration 5 ------------------------------
+HF energy: -14.57061 (hartree) = -396.48075 (eV)
+dE       : 4.45e-03
+time used: 0.0 s
+------------------------------ Iteration 6 ------------------------------
+HF energy: -14.57187 (hartree) = -396.51521 (eV)
+dE       : 1.27e-03
+time used: 0.0 s
+------------------------------ Iteration 7 ------------------------------
+HF energy: -14.57223 (hartree) = -396.52493 (eV)
+dE       : 3.57e-04
+time used: 0.0 s
+------------------------------ Iteration 8 ------------------------------
+HF energy: -14.57233 (hartree) = -396.52766 (eV)
+dE       : 1.01e-04
+time used: 0.0 s
+------------------------------ Iteration 9 ------------------------------
+HF energy: -14.57236 (hartree) = -396.52843 (eV)
+dE       : 2.83e-05
+time used: 0.0 s
+------------------------------ Iteration 10 ------------------------------
+HF energy: -14.57237 (hartree) = -396.52865 (eV)
+dE       : 7.94e-06
+time used: 0.0 s
+------------------------------ Iteration 11 ------------------------------
+HF energy: -14.57237 (hartree) = -396.52871 (eV)
+dE       : 2.23e-06
+time used: 0.0 s
+------------------------------ Iteration 12 ------------------------------
+HF energy: -14.57237 (hartree) = -396.52872 (eV)
+dE       : 6.27e-07
+time used: 0.0 s
+</code></pre><p><img src=/images/hartree-fock/1_Restricted_Hartree_Fock_for_Atom_63_1.png alt=png></p><p><img src=/images/hartree-fock/1_Restricted_Hartree_Fock_for_Atom_63_2.png alt=png></p><p><img src=/images/hartree-fock/1_Restricted_Hartree_Fock_for_Atom_63_3.png alt=png></p><p><img src=/images/hartree-fock/1_Restricted_Hartree_Fock_for_Atom_63_4.png alt=png></p><p><img src=/images/hartree-fock/1_Restricted_Hartree_Fock_for_Atom_63_5.png alt=png></p><pre><code>---------------------------- PASSED --------------------------------
+cal: -14.5723687, ref: -14.5723690
+</code></pre><h3 id=12-limitations>12. Limitations</h3><p>Limitations of this implementation:</p><ol><li>Because of the coordinate system (Spherical coordinate system), this implementation can only deal with atom.</li><li>Because angular part is not included in current STO function, only atoms which only have s orbital could be represented by STO.</li><li>For restricted hartree fock, could only run closed shell atom.</li><li>Integral calculated by sympy, which is slow but easy to understand.</li></ol><h3 id=13-reference>13. Reference</h3><p>[1] Levine, Quantum Chemistry, 7th Edition, chapter 14<br>[2] Wikipedia
+<a href=https://en.wikipedia.org/wiki/Hartree%E2%80%93Fock_method#Hartree%E2%80%93Fock_algorithm>Hartree–Fock method</a>,
+<a href=https://en.wikipedia.org/wiki/Fock_matrix>Fock matrix</a>,
+<a href=https://en.wikipedia.org/wiki/Roothaan_equations>Roothaan equations</a>,
+<a href=https://en.wikipedia.org/wiki/Coulomb_operator>Coulomb operator</a>,
+<a href=https://en.wikipedia.org/wiki/Exchange_operator>Exchange operator</a><br>[3] Clementi, Enrico, and Carla Roetti. <a href=https://www.sciencedirect.com/science/article/pii/S0092640X74800161>Roothaan-Hartree-Fock atomic wavefunctions: Basis functions and their coefficients for ground and certain excited states of neutral and ionized atoms, Z≤ 54.</a> Atomic data and nuclear data tables 14.3-4 (1974): 177-478.<br>[4] Acosta C R. <a href=https://files.eric.ed.gov/fulltext/EJ1051495.pdf>Restricted closed shell Hartree Fock Roothaan matrix method applied to Helium atom using Mathematica[J].</a> European Journal of Physics Education, 2017, 5(1): 1-14.<br>[5] Jacob Martin, <a href=http://nznano.blogspot.com/2018/03/simple-quantum-chemistry-hartree-fock.html>Simple Quantum Chemistry: Hartree-Fock in Python</a>, 2018<br>[6] Claire Vallance, <a href=https://chem.libretexts.org/Bookshelves/Physical_and_Theoretical_Chemistry_Textbook_Maps/Book%3A_Symmetry_(Vallance)/20%3A_Calculating_Orbital_Energies_and_Expansion_Coefficients>Calculating Orbital Energies and Expansion Coefficients</a>, 2019</p></div><footer class=post-footer><div class=post-lastmod><time datetime=2019-11-19T14:51:14-04:00>Updated @ November 19, 2019</time><p></p></div></footer><div class=comments><div class=comments><div class="comments-item comments-valine"><div id=vcomments></div><script src=//unpkg.com/valine/dist/Valine.min.js></script><script type=text/javascript>new Valine({el:'#vcomments',highlight:!1,lang:"en",appId:"74QDrbg66RfM63rSf8sdCrj4-MdYXbMMI",appKey:"vfdnthM7M3QWVy1sKzSHLKzm",placeholder:"Say Something?",requiredFields:["nick","mail"],avatar:"wavatar",visitor:!0,recordIP:!0,serverURLs:"https://74qdrbg6.api.lncldglobal.com"})</script><script>if(window.location.hash)var checkExist=setInterval(function(){$(window.location.hash).length&&($('html, body, article').animate({scrollTop:$(window.location.hash).offset().top-90},1e3),clearInterval(checkExist))},100)</script></div></div></div></article><div class=foot>&copy; 2018 - 2024 &#183;
+<a href=/>yyrcd</a> &#183;
+RSS&nbsp; <a href=https://yyrcd.com/index.xml target=_blank><i title=RSS class="fas fa-rss"></i></a><br>Theme <a href=https://github.com/RainerChiang/simpleness>Simpleness</a> Powered by Hugo</div></body><div class=others></div></html>
