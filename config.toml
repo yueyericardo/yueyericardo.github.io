@@ -1,0 +1,70 @@
+baseURL = "https://yyrcd.com/"
+languageCode = "en"
+DefaultContentLanguage = "en"
+enableInlineShortcodes = true
+enableEmoji = true
+# pagination = 10
+
+title = "yyrcd"
+
+theme = "simpleness"
+
+[params]
+  lazyImage = false
+  enableMathJax = false # enable it in Front Matter
+  enableReadingTime = false
+  favicon = "/images/favicon.ico"
+  startyear = "2018"
+  showmonth = true
+  disqus = ""
+  author = "yyrcd"
+  description = "yueyericardo"
+  avatarImage = "/images/avatar.jpg"
+
+[params.valine]
+  enable = true
+  lang = 'en' # zh-CN
+  appId = '74QDrbg66RfM63rSf8sdCrj4-MdYXbMMI'
+  appKey = 'vfdnthM7M3QWVy1sKzSHLKzm'
+  serverURLs = 'https://74qdrbg6.api.lncldglobal.com'
+  placeholder = 'Say Something?'
+  requiredFields = ['nick', 'mail']
+  avatar = 'wavatar'
+  visitor = true
+  enableHeaderVisitor = true
+  debug = true
+
+[menu]
+  [[menu.main]]
+  name = "Home"
+  url = "/"
+  weight = 1
+  [[menu.main]]
+  name = "音乐迁移"
+  url = "/n2s/"
+  weight = 2 
+
+[social]
+  github = ""
+  rss = "index.xml"
+
+[taxonomies]
+category = "categories"
+tag = "tags"
+
+# doc: https://gohugo.io/getting-started/configuration-markup#highlight
+# syntax style: https://xyproto.github.io/splash/docs/longer/all.html
+[markup]
+  [markup.highlight]
+    codeFences = true
+    guessSyntax = false
+    hl_Lines = ""
+    lineNoStart = 1
+    lineNos = false
+    lineNumbersInTable = true
+    noClasses = true
+    style = "monokai" # github, dracula, vim, monokai
+    tabWidth = 4
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true
